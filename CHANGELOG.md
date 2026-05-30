@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-05-30
+
+### Added
+
+#### GPS Recording Improvements
+- **Speed-adaptive distance threshold** — replaces the fixed 15m threshold with a speed-scaled table matching Google Maps' capture strategy:
+  - ≤ 10 mph → 8m (slow/stopped, preserves manoeuvring detail)
+  - ≤ 35 mph → 15m (suburban)
+  - ≤ 60 mph → 25m (arterial/mixed roads)
+  - \> 60 mph → 40m (highway — ~1 point per 1.5 sec at 65 mph)
+- **Minimum 2-second time gate** — both distance AND time must be satisfied to record a point; prevents GPS jitter bursts at stops
+- **Ramer-Douglas-Peucker simplification at save time** — removes collinear points within 10m of straight-line segments before storage; turns and curves fully preserved; typical 20–40% reduction on highway sections
+
+#### Analysis basis
+Drive 1 (pre-fix): 11.09 mi → 1,555 pts @ 140 pts/mile  
+Drive 2 (post-fix): 27.08 mi → 1,138 pts @ 42 pts/mile  
+Projected 3-hour suburban drive: ~4,000 pts (was ~11,200 without these changes)
+
+---
+
 ## [1.0.0] - 2026-05-30
 
 ### Initial Release
@@ -96,8 +116,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Planned
-- Speed-adaptive GPS distance threshold
-- Minimum time gap between recorded points
-- RDP (Ramer-Douglas-Peucker) route simplification
 - GCS file-based coordinate storage (replacing Firestore inline coordinates)
 - "Copy for AI" drive export button
