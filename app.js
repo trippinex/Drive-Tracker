@@ -757,7 +757,7 @@ async function startDrive() {
   if (!selectedVehicle) {
     const vehicles = await getAllVehicles();
     if (!vehicles.length) {
-      setStatus('No vehicles configured. Add one in Menu → Settings before starting a drive.');
+      setStatus('No vehicles configured. Add one in Menu → Garage before starting a drive.');
     } else {
       setStatus('Please select a vehicle before starting a drive.');
     }
@@ -1245,7 +1245,7 @@ async function populateVehicleDropdown() {
 
   if (!vehicles.length) {
     const opt = document.createElement('option');
-    opt.value = ''; opt.textContent = 'No vehicles — add one in Settings';
+    opt.value = ''; opt.textContent = 'No vehicles — add one in Garage';
     select.appendChild(opt);
     updateVehiclePhoto('');
     return;
