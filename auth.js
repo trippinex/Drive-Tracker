@@ -14,20 +14,21 @@
 
 'use strict';
 
-// ── Allowed email ─────────────────────────────────────────────────────────────
-// Only this Google account can sign in. All others are rejected after auth.
-const ALLOWED_EMAIL = 'scott.burgett@gmail.com';
+// ── Config ────────────────────────────────────────────────────────────────────
+// All secrets are loaded from window.DRIVETRACKER_CONFIG, which is injected by
+// config.js at runtime. config.js is never committed to source control:
+//   Local dev:   run generate-config.ps1 to create config.js from .env
+//   Production:  Cloud Build generates config.js from GCP Secret Manager
+const _cfg = window.DRIVETRACKER_CONFIG || {};
 
-// ── Firebase config ───────────────────────────────────────────────────────────
-// Replace every PASTE_YOUR_* value with the real values from:
-// Firebase Console → Project settings → Your apps → DriveTracker (web) → firebaseConfig
+const ALLOWED_EMAIL  = _cfg.ALLOWED_EMAIL  || '';
 const firebaseConfig = {
-  apiKey:            'AIzaSyCozRwXwRcdmBPxkm0LIa8dQRfaRRkwleQ',
-  authDomain:        'drive-tracker-497900-76413.firebaseapp.com',
-  projectId:         'drive-tracker-497900-76413',
-  storageBucket:     'drive-tracker-497900-76413.firebasestorage.app',
-  messagingSenderId: '810269700756',
-  appId:             '1:810269700756:web:c679f023aeadef6faffa81',
+  apiKey:            _cfg.FIREBASE_API_KEY,
+  authDomain:        _cfg.FIREBASE_AUTH_DOMAIN,
+  projectId:         _cfg.FIREBASE_PROJECT_ID,
+  storageBucket:     _cfg.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: _cfg.FIREBASE_MESSAGING_SENDER_ID,
+  appId:             _cfg.FIREBASE_APP_ID,
 };
 
 // ── Guard: don't crash if the config hasn't been filled in yet ────────────────

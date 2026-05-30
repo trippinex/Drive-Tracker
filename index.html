@@ -515,6 +515,10 @@
   <!-- Sync engine — must load after app.js (uses its DB helpers) -->
   <script src="/sync.js?v=1"></script>
 
+  <!-- Runtime config — injected secrets, never committed to source control.
+       Must load before auth.js. Generated from .env locally or Secret Manager in CI. -->
+  <script src="/config.js"></script>
+
   <!-- Auth — must load last (calls initApp and initSync after sign-in) -->
   <script src="/auth.js?v=3"></script>
 

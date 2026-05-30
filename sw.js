@@ -93,7 +93,9 @@ self.addEventListener('fetch', event => {
   // index.html and auth.js — network-first so deployments are visible immediately.
   // These files are served with no-cache headers; the SW must not override that
   // with a stale cached copy or users would be stuck on old HTML/auth code.
-  if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/auth.js') {
+  // config.js contains injected secrets — must never be served from SW cache.
+  if (url.pathname === '/' || url.pathname === '/index.html' ||
+      url.pathname === '/auth.js' || url.pathname === '/config.js') {
     event.respondWith(networkFirst(request, SHELL_CACHE));
     return;
   }
