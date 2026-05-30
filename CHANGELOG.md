@@ -100,7 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Deployment
 - Hosted on Google Cloud Storage behind a Cloud Load Balancer
-- HTTPS via Google-managed SSL certificate for `drivetracker.soccerwrek.net`
+- HTTPS via Google-managed SSL certificate on a custom domain
 - Cloud CDN with per-file cache-control strategy
 - Versioned asset URLs (`?v=N`) for deterministic browser cache busting
 - `index.html`, `auth.js`, `sync.js` served `no-cache` for immediate update delivery

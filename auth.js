@@ -8,7 +8,7 @@
  * 1. Go to console.firebase.google.com
  * 2. Add project → select drive-tracker-497900
  * 3. Build → Authentication → Get started → Google → Enable
- * 4. Authentication → Settings → Authorized domains → add drivetracker.soccerwrek.net
+ * 4. Authentication → Settings → Authorized domains → add your custom domain
  * 5. Project settings → Your apps → Add web app → copy firebaseConfig below
  */
 

@@ -2,8 +2,6 @@
 
 A Progressive Web App (PWA) for car enthusiasts to record driving routes, track real-time telemetry, and manage a garage of vehicles — all from a phone mount.
 
-**Live app:** [drivetracker.soccerwrek.net](https://drivetracker.soccerwrek.net)
-
 ---
 
 ## Features
@@ -79,7 +77,7 @@ Browser (PWA)
     ├── Firestore          — cloud sync (metadata + GPS coordinates)
     │
     └── GCS Bucket         — static file hosting
-          └── Cloud CDN → drivetracker.soccerwrek.net
+          └── Cloud CDN → custom domain
 ```
 
 ---
