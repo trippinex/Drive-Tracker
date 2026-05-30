@@ -1,0 +1,68 @@
+{# ─────────────────────────────────────────────────────────────────────────
+   Reference base template for a Flask + Jinja PWA using this theme.
+   Copy into your project as templates/base.html and adjust.
+   ───────────────────────────────────────────────────────────────────────── #}
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}YourApp{% endblock %}</title>
+
+  {# PWA / installable app #}
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="YourApp" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/touch-180.png') }}" />
+  <meta name="theme-color" content="#1e293b" />
+
+  {# Pre-built theme + app CSS. ?v={{ app_version }} is a cache-buster — when
+     you deploy, every client picks up the new file on the next request. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ app_version }}" />
+</head>
+<body class="h-full bg-slate-50 text-slate-800 antialiased">
+
+  {# ── Sticky top nav ─────────────────────────────────────────────────── #}
+  <nav class="bg-slate-800 shadow-lg sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="flex items-center justify-between h-14">
+        <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 text-white font-bold text-lg">
+          <img src="{{ url_for('static', filename='icons/nav-32.png') }}" alt="" class="w-8 h-8 shrink-0" />
+          YourApp
+        </a>
+
+        {% if current_user.is_authenticated %}
+        <div class="hidden sm:flex items-center gap-1">
+          <a href="{{ url_for('main.index') }}"
+             class="nav-link {% if request.endpoint == 'main.index' %}active{% endif %}">Dashboard</a>
+          {# add more nav links here #}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  {# ── Flash messages ─────────────────────────────────────────────────── #}
+  <div class="max-w-6xl mx-auto px-4 pt-4 space-y-2">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="{% if category == 'error' %}alert-error{% else %}alert-success{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+
+  {# ── Page content ───────────────────────────────────────────────────── #}
+  <main class="max-w-6xl mx-auto px-4 py-5 sm:py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="text-center text-xs text-slate-400 py-6">
+    YourApp &mdash; tagline
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

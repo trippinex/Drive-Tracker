@@ -1,0 +1,71 @@
+/* ─────────────────────────────────────────────────────────────────────
+   Slate + Orange UI theme — source CSS.
+   Import this file from your project's input.css, then run Tailwind.
+   ───────────────────────────────────────────────────────────────────── */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────
+   Base layer — browser fixes that apply to raw HTML elements.
+   ───────────────────────────────────────────────────────────────────── */
+@layer base {
+  /* Prevent iOS double-tap zoom on interactive elements */
+  a, button, [role="button"] { touch-action: manipulation; }
+
+  /* Hide number-input spinners — they look poor on mobile and waste space */
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
+
+  /* iOS Safari renders date / time inputs as native widgets with an
+     intrinsic width that overflows narrow containers. Disabling appearance
+     restores standard CSS sizing. */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="week"] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    display: block;
+    box-sizing: border-box;
+  }
+  input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+  input[type="date"]::-webkit-calendar-picker-indicator { padding: 0; margin-left: 4px; }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Component layer — reusable building blocks.
+   ───────────────────────────────────────────────────────────────────── */
+@layer components {
+
+  /* ── Top-nav links (dark slate nav bar) ── */
+  .nav-link        { @apply text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors; }
+  .nav-link.active { @apply bg-slate-700 text-white; }
+
+  /* ── Surfaces ── */
+  .card        { @apply bg-white rounded-xl shadow-sm border border-slate-100 p-4 sm:p-5; }
+  .metric-card { @apply bg-white rounded-xl shadow-sm border border-slate-100 p-4 sm:p-5 flex flex-col gap-1; }
+  .metric-label { @apply text-xs font-semibold uppercase tracking-wider text-slate-400; }
+  .metric-value { @apply text-2xl font-bold text-slate-800; }
+  .metric-sub   { @apply text-xs text-slate-400; }
+
+  /* ── Buttons — 44 × 44 px minimum tap target (Apple HIG) ── */
+  .btn-primary   { @apply inline-flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 active:bg-brand-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors text-sm min-h-[44px]; }
+  .btn-secondary { @apply inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold py-2.5 px-4 rounded-lg transition-colors text-sm min-h-[44px]; }
+  .btn-danger    { @apply inline-flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-600 font-semibold py-2.5 px-3 rounded-lg transition-colors text-sm min-h-[44px]; }
+
+  /* ── Forms — text-base (16 px) on mobile to stop iOS auto-zoom on focus ── */
+  .form-label  { @apply block text-sm font-medium text-slate-700 mb-1; }
+  .form-input  { @apply w-full rounded-lg border border-slate-300 px-3 py-3 text-base sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent min-h-[44px]; }
+  .form-select { @apply w-full rounded-lg border border-slate-300 px-3 py-3 text-base sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white min-h-[44px]; }
+
+  /* ── Alerts / flash messages ── */
+  .alert-success { @apply bg-green-50 border border-green-200 text-green-800 rounded-lg px-4 py-3 text-sm; }
+  .alert-error   { @apply bg-red-50 border border-red-200 text-red-800 rounded-lg px-4 py-3 text-sm; }
+}

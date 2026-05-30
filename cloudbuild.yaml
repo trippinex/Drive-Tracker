@@ -1,0 +1,129 @@
+﻿# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# DriveTracker â€” Google Cloud Build CI/CD Pipeline
+#
+# Triggered automatically on every push to the `main` branch via a Cloud Build
+# GitHub trigger (configured in GCP Console or via gcloud CLI).
+#
+# What this pipeline does:
+#   1. (Optional) Validates the project structure / runs linting.
+#   2. Deploys all static assets to GCS with appropriate cache-control headers.
+#   3. Specifically sets `no-cache` on sw.js so browsers always re-fetch the
+#      service worker and pick up new versions without being stuck on a stale SW.
+#
+# Pre-requisites:
+#   - A GCS bucket named ${_BUCKET} already configured for static website hosting.
+#   - The Cloud Build service account has `roles/storage.objectAdmin` on the bucket.
+#   - Substitution variables set in the trigger (see "Substitutions" below).
+#
+# Substitutions (set in Cloud Build trigger UI or --substitutions flag):
+#   _BUCKET      : Your GCS bucket name, e.g. DriveTracker-app
+#   _REGION      : GCS bucket region, e.g. us-central1 (informational only)
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+substitutions:
+  _BUCKET: DriveTracker-app          # override in the trigger with your bucket name
+  _REGION: us-central1
+
+options:
+  logging: CLOUD_LOGGING_ONLY    # send logs to Cloud Logging, not GCS
+
+steps:
+
+  # â”€â”€ Step 1: Validate project files exist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  - name: 'bash'
+    id: 'validate'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "=== DriveTracker build validation ==="
+        for f in index.html app.js styles.css sw.js manifest.json; do
+          if [ ! -f "$$f" ]; then
+            echo "ERROR: Missing required file: $$f"
+            exit 1
+          fi
+          echo "  âœ“ $$f"
+        done
+        echo "All required files present."
+
+  # â”€â”€ Step 2: Deploy all assets EXCEPT sw.js â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # Cache-Control: public, max-age=31536000 (1 year) for versioned/hashed assets.
+  # For this single-file app we use a moderate 1-hour cache for HTML/JS/CSS so
+  # updates propagate within an hour without hammering origin servers.
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'deploy-assets'
+    waitFor: ['validate']
+    args:
+      - '-m'                                          # parallel transfer
+      - 'rsync'
+      - '-r'                                          # recursive
+      - '-d'                                          # delete removed files
+      - '-x'
+      - 'sw\.js'                                      # exclude sw.js (handled separately)
+      - '-h'
+      - 'Cache-Control:public, max-age=3600, must-revalidate'
+      - '.'
+      - 'gs://${_BUCKET}/'
+
+  # â”€â”€ Step 3: Deploy sw.js with no-cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # The service worker MUST be served with Cache-Control: no-cache so browsers
+  # check for an updated version on every navigation, enabling the SW update flow.
+  # If sw.js were cached aggressively, users could be stuck on old versions for
+  # hours/days even after a deployment.
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'deploy-sw'
+    waitFor: ['validate']
+    args:
+      - 'cp'
+      - '-h'
+      - 'Cache-Control:no-cache, no-store, must-revalidate'
+      - 'sw.js'
+      - 'gs://${_BUCKET}/sw.js'
+
+  # â”€â”€ Step 4: Set bucket-level CORS and website config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # Idempotent â€” safe to run on every deploy. Ensures CORS is correct if the
+  # bucket is re-created or settings drift.
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'set-website-config'
+    waitFor: ['deploy-assets', 'deploy-sw']
+    args:
+      - 'web'
+      - 'set'
+      - '-m'
+      - 'index.html'
+      - '-e'
+      - '404.html'
+      - 'gs://${_BUCKET}'
+
+  # â”€â”€ Step 5: Make all objects publicly readable â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'set-public-acl'
+    waitFor: ['set-website-config']
+    args:
+      - 'iam'
+      - 'ch'
+      - 'allUsers:objectViewer'
+      - 'gs://${_BUCKET}'
+
+  # â”€â”€ Step 6: Verify deployment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  - name: 'gcr.io/cloud-builders/curl'
+    id: 'smoke-test'
+    waitFor: ['set-public-acl']
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "=== Smoke-testing deployment ==="
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          "https://storage.googleapis.com/${_BUCKET}/index.html")
+        if [ "$$STATUS" != "200" ]; then
+          echo "ERROR: index.html returned HTTP $$STATUS"
+          exit 1
+        fi
+        echo "  âœ“ index.html returned 200"
+        SW_CACHE=$(curl -sI "https://storage.googleapis.com/${_BUCKET}/sw.js" \
+          | grep -i cache-control)
+        echo "  sw.js Cache-Control: $$SW_CACHE"
+        echo "Deployment verified."
+
+timeout: '600s'   # 10 min timeout â€” generous for slow gsutil syncs on large tile caches

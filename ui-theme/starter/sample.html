@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Theme Sample — Slate + Orange UI</title>
+  <link rel="stylesheet" href="../theme.css" />
+</head>
+<body class="h-full bg-slate-50 text-slate-800 antialiased">
+
+  <!-- ── Sticky nav ── -->
+  <nav class="bg-slate-800 shadow-lg sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 flex items-center justify-between h-14">
+      <a href="#" class="text-white font-bold text-lg">YourApp</a>
+      <div class="hidden sm:flex items-center gap-1">
+        <a href="#" class="nav-link active">Dashboard</a>
+        <a href="#" class="nav-link">Reports</a>
+        <a href="#" class="nav-link">Settings</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-8">
+
+    <!-- ── Section title ── -->
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800">UI Theme Gallery</h1>
+      <p class="text-sm text-slate-500 mt-0.5">Every component, in one page.</p>
+    </div>
+
+    <!-- ── Metric cards ── -->
+    <section>
+      <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Metrics</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="metric-card">
+          <span class="metric-label">Revenue</span>
+          <span class="metric-value">$12,450</span>
+          <span class="metric-sub">this month</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Users</span>
+          <span class="metric-value">1,284</span>
+          <span class="metric-sub">active</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Conversion</span>
+          <span class="metric-value text-green-600">3.4%</span>
+          <span class="metric-sub">vs 2.9% last mo.</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Churn</span>
+          <span class="metric-value text-red-500">1.2%</span>
+          <span class="metric-sub">monthly</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Card with form ── -->
+    <section>
+      <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Form Card</h2>
+      <div class="card max-w-lg space-y-4">
+        <div>
+          <label class="form-label" for="s-name">Full name</label>
+          <input class="form-input" id="s-name" type="text" placeholder="Jane Doe" />
+        </div>
+        <div>
+          <label class="form-label" for="s-role">Role</label>
+          <select class="form-select" id="s-role">
+            <option>Administrator</option>
+            <option>Editor</option>
+            <option>Viewer</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" for="s-date">Start date</label>
+          <input class="form-input" id="s-date" type="date" />
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3 pt-1">
+          <button type="button" class="btn-primary">Save</button>
+          <button type="button" class="btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Buttons ── -->
+    <section>
+      <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Buttons</h2>
+      <div class="card flex flex-wrap gap-3">
+        <button class="btn-primary">Primary Action</button>
+        <button class="btn-secondary">Secondary</button>
+        <button class="btn-danger">Delete</button>
+      </div>
+    </section>
+
+    <!-- ── Alerts ── -->
+    <section>
+      <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Alerts</h2>
+      <div class="space-y-3 max-w-2xl">
+        <div class="alert-success">Settings saved successfully.</div>
+        <div class="alert-error">Something went wrong — please try again.</div>
+      </div>
+    </section>
+
+    <!-- ── Brand colour swatches ── -->
+    <section>
+      <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Brand Palette</h2>
+      <div class="card">
+        <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <div class="rounded-lg p-3 text-center text-xs font-mono bg-brand-50  text-slate-700">50</div>
+          <div class="rounded-lg p-3 text-center text-xs font-mono bg-brand-100 text-slate-700">100</div>
+          <div class="rounded-lg p-3 text-center text-xs font-mono bg-brand-400 text-white">400</div>
+          <div class="rounded-lg p-3 text-center text-xs font-mono bg-brand-500 text-white">500</div>
+          <div class="rounded-lg p-3 text-center text-xs font-mono bg-brand-600 text-white">600</div>
+          <div class="rounded-lg p-3 text-center text-xs font-mono bg-brand-700 text-white">700</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="text-center text-xs text-slate-400 py-6">
+    Slate + Orange UI Theme
+  </footer>
+</body>
+</html>

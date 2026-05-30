@@ -1,0 +1,36 @@
+{
+  "name": "DriveTracker – Car Enthusiast Tracker",
+  "short_name": "DriveTracker",
+  "description": "Real-time driving route tracker and vehicle telemetry dashboard for car enthusiasts.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1e293b",
+  "theme_color": "#1e293b",
+  "lang": "en-US",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "icons/icon-v2-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-v2-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["navigation", "sports", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Start New Drive",
+      "short_name": "New Drive",
+      "description": "Jump straight into a new tracking session",
+      "url": "/index.html?action=start",
+      "icons": [{ "src": "icons/icon-v2-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

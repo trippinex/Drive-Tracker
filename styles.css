@@ -1,0 +1,1405 @@
+/* ============================================================
+   DriveTracker – styles.css
+   Layers on top of ui-theme/theme.css (Slate + Orange kit).
+
+   Structure:
+     1. CSS custom properties (brand tokens mapped to dark dashboard)
+     2. Root / body dark overrides
+     3. Scrollbar
+     4. Map & Leaflet overrides
+     5. Animated car marker
+     6. Telemetry grid  (uses .metric-card from theme, overridden dark)
+     7. App header      (uses bg-slate-800 from theme)
+     8. Vehicle selector (uses .form-select from theme, overridden dark)
+     9. Wake-lock indicator
+    10. CTA button (extends .btn-primary / .btn-danger from theme)
+    11. Status bar
+    12. History bottom sheet
+    13. SW update toast
+    14. Accuracy badge
+    15. History FAB
+    16. Accessibility utility
+   ============================================================ */
+
+/* ── 1. Design tokens ────────────────────────────────────── */
+:root {
+  /* Brand (orange from theme preset — #f97316 = brand-500) */
+  --brand:        #f97316;
+  --brand-dark:   #ea580c;
+  --brand-darker: #c2410c;
+
+  /* Semantic CTA colors — green/red kept intentionally */
+  --start-bg:    #22c55e;
+  --start-dark:  #15803d;
+  --stop-bg:     #ef4444;
+  --stop-dark:   #b91c1c;
+
+  /* Surfaces — light theme (mirrors theme's slate scale) */
+  --surface:     #f8fafc;   /* slate-50  */
+  --surface-2:   #ffffff;   /* white     */
+  --surface-3:   #f1f5f9;   /* slate-100 */
+  --surface-4:   #e2e8f0;   /* slate-200 */
+  --border:      #f1f5f9;   /* slate-100 */
+  --border-mid:  #e2e8f0;   /* slate-200 */
+
+  /* Text — dark-on-light */
+  --text:        #1e293b;   /* slate-800 */
+  --text-muted:  #64748b;   /* slate-500 */
+}
+
+/* ── 2. Root / body — light theme, iOS-safe viewport height ────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+/*
+  iOS Safari treats 100vh as the viewport INCLUDING the browser chrome,
+  so content overflows and the bottom CTA button gets clipped.
+  Fix: set html to -webkit-fill-available, body to 100dvh with fallback.
+  dvh (dynamic viewport height) shrinks/grows as the toolbar shows/hides.
+*/
+html {
+  height: -webkit-fill-available;  /* iOS Safari ≤ 15 fallback */
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;                     /* non-iOS fallback */
+  min-height: -webkit-fill-available;    /* iOS Safari ≤ 15  */
+  min-height: 100dvh;                    /* modern — dynamic viewport */
+  height: 100dvh;                        /* flex container needs explicit height */
+  background: var(--surface);
+  color: var(--text);
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+
+/* ── 3. Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--brand); border-radius: 2px; }
+
+/* ── 4. Map & Leaflet overrides ──────────────────────────── */
+#map {
+  width: 100%;
+  height: 100%;
+  background: #e2e8f0;   /* slate-200 — visible while light tiles load */
+  z-index: 0;
+}
+
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  background: rgba(255,255,255,.8) !important;
+  color: #94a3b8 !important;
+}
+.leaflet-control-attribution a { color: #64748b !important; }
+
+/* ── 5. Route direction arrows ───────────────────────────── */
+.route-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 14px;
+  /* transform applied inline per bearing */
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
+}
+
+/* ── 6. Blue "you are here" location dot ─────────────────── */
+.location-dot-wrapper {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Outer pulsating ring */
+.location-dot-ring {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.2);   /* blue-500 at 20% */
+  animation: location-pulse 2s ease-out infinite;
+}
+
+/* Inner solid blue dot with white border */
+.location-dot-core {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #3b82f6;      /* blue-500 */
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);
+  z-index: 1;
+}
+
+@keyframes location-pulse {
+  0%   { transform: scale(0.5); opacity: 0.8; }
+  70%  { transform: scale(1.4); opacity: 0;   }
+  100% { transform: scale(1.4); opacity: 0;   }
+}
+
+/* ── 6. Animated car marker ──────────────────────────────── */
+.car-marker-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--brand);          /* orange brand accent */
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 0 rgba(249,115,22,.7);
+  animation: pulse-ring 2s cubic-bezier(.455,.03,.515,.955) infinite;
+  font-size: 18px;
+  line-height: 1;
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0   rgba(249,115,22,.7); }
+  70%  { box-shadow: 0 0 0 12px rgba(249,115,22,0);  }
+  100% { box-shadow: 0 0 0 0   rgba(249,115,22,0);   }
+}
+
+/* ── 6. Vehicle photo (above Speed card) ─────────────────── */
+.vehicle-photo-wrap {
+  /* Sits in DOM flow above the telemetry grid, left-aligned so it
+     hovers directly above the Speed card column. */
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 8px 6px 8px;
+}
+
+.vehicle-photo-wrap.hidden { display: none !important; }
+
+.vehicle-photo-img {
+  width: 100px;
+  height: 75px;
+  object-fit: contain;   /* contain preserves transparent edges */
+  border-radius: 10px;
+  border: 2px solid rgba(255,255,255,0.9);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  background: transparent;
+}
+
+/* ── 7. Telemetry cards — theme styles + iOS-safe sizing ─── */
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 8px;
+}
+
+.metric-card {
+  /* Ensure rounded corners render on iOS (theme uses rounded-xl = 0.75rem) */
+  border-radius: 0.75rem !important;
+  -webkit-border-radius: 0.75rem !important;
+  padding: 10px 14px !important;
+  transition: border-color .2s;
+  /* Prevent iOS from collapsing the card in a flex/grid container */
+  min-width: 0;
+}
+.metric-card.active-card { border-color: var(--brand) !important; }
+
+.metric-value {
+  font-size: 28px !important;
+  font-weight: 800 !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  line-height: 1 !important;
+}
+
+/* Speed card goes orange (brand) when moving > 2 mph */
+.metric-card.speed-active .metric-value { color: var(--brand) !important; }
+
+/* ── 7. App header ───────────────────────────────────────── */
+#app-header {
+  position: relative;
+  z-index: 10;
+  padding-top: max(8px, calc(env(safe-area-inset-top) + 4px));
+  padding-bottom: 8px;
+  padding-left: 16px;
+  padding-right: 16px;
+  /* Space-between now acts on two logical groups (left + right),
+     not on every individual element — fixes the desktop scatter. */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  border-bottom: 1px solid #1e293b;
+}
+
+/* ── Header left group: logo + vehicle selector ─────────── */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;              /* grow to fill available space */
+  max-width: 520px;     /* but cap on very wide screens */
+}
+
+/* ── Header right group: indicators + avatar + menu ────── */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Logo ────────────────────────────────────────────────── */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.logo span { color: var(--brand); }
+
+.logo-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+/* ── Login screen app icon ───────────────────────────────── */
+.login-app-icon {
+  width: 96px;
+  height: 96px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+  margin-bottom: 4px;
+}
+
+/* ── Settings footer ─────────────────────────────────────── */
+.settings-app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border-mid);
+  flex-shrink: 0;
+}
+.settings-app-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  opacity: 0.7;
+}
+.settings-app-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ── Vehicle selector with car icon prefix ──────────────── */
+.vehicle-select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;              /* fill the header-left remaining space */
+  min-width: 120px;
+  max-width: 320px;
+}
+
+#vehicle-select.form-select {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 38px !important;
+  font-size: 16px !important;
+  transform: none !important;
+}
+
+
+/* ── Wake-lock dot — hidden until active (#1) ────────────── */
+.wakelock-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: transparent;   /* invisible when inactive */
+  flex-shrink: 0;
+  transition: background .3s, box-shadow .3s;
+}
+.wakelock-dot.active {
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+
+/* ── Hamburger — icon-only, 44px tap target (#2, #7) ─────── */
+.header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  background: var(--surface-3);
+  border: 1px solid #475569;
+  color: #fff;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .15s;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.header-icon-btn:hover  { background: #334155; }
+.header-icon-btn:active { background: #1e293b; }
+
+/* ── 8. Vehicle selector — iOS-safe ─────────────────────── */
+/*
+   iOS Safari ignores many custom select styles unless -webkit-appearance: none
+   is set explicitly. Font-size MUST be >= 16px or iOS will auto-zoom the page
+   when the select is tapped, which is jarring on a phone mount.
+   We use font-size: 16px here and scale the text down visually with transform
+   so it still fits in the header without triggering the zoom.
+*/
+#vehicle-select.form-select {
+  background-color: var(--surface-3) !important;
+  border-color: var(--border-mid) !important;
+  color: var(--text) !important;
+  min-height: 36px !important;
+  padding: 6px 28px 6px 10px !important;
+  font-size: 16px !important;             /* ≥ 16px — prevents iOS auto-zoom */
+  transform: scale(0.8125);              /* visually 13px (16 × 0.8125) */
+  transform-origin: left center;
+  font-weight: 600;
+  flex: 1;
+  max-width: 246px;                       /* wider to compensate for scale */
+  -webkit-appearance: none !important;   /* iOS Safari explicit prefix */
+  appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 8px center !important;
+  border-radius: 8px !important;
+}
+#vehicle-select.form-select:focus {
+  outline: 2px solid rgb(249 115 22 / .5);
+  outline-offset: 0;
+  border-color: transparent !important;
+}
+#vehicle-select.form-select:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* ── 9. Wake-lock indicator ──────────────────────────────── */
+#wakelock-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+  transition: background .3s;
+}
+#wakelock-status.active {
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+
+/* ── 10. CTA button ──────────────────────────────────────── */
+/*
+   Full-width footer button. Key iOS fixes:
+   - padding-bottom adds env(safe-area-inset-bottom) so the button
+     clears the iPhone home indicator bar on notched devices.
+   - margin-bottom also respects the safe area so there's breathing room.
+   - min-height: 60px guarantees a comfortable tap target even when
+     safe-area-inset-bottom is 0 (non-notched devices).
+*/
+#cta-btn {
+  position: relative;
+  width: calc(100% - 32px);
+  margin: 0 16px 16px;
+  padding: 18px;
+  min-height: 60px;
+  border-radius: 14px;
+  border: none;
+  border-radius: 14px;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .2s, transform .1s, box-shadow .2s;
+  outline: none;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fff;
+}
+
+/* Start state — green (session not running) */
+#cta-btn.start {
+  background: var(--start-bg);
+  box-shadow: 0 4px 20px rgba(34,197,94,.35);
+}
+#cta-btn.start:hover  { background: #16a34a; }
+#cta-btn.start:active { transform: scale(.98); background: var(--start-dark); }
+
+/* Stop state — red (session running) */
+#cta-btn.stop {
+  background: var(--stop-bg);
+  box-shadow: 0 4px 20px rgba(239,68,68,.35);
+}
+#cta-btn.stop:hover  { background: #dc2626; }
+#cta-btn.stop:active { transform: scale(.98); background: var(--stop-dark); }
+
+/* Blinking REC dot inside the Stop button */
+#cta-btn.stop::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  animation: blink 1s step-start infinite;
+  flex-shrink: 0;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ── 11. Status bar ──────────────────────────────────────── */
+#status-bar {
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  padding: 4px 16px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+  flex-shrink: 0;
+  min-height: 24px;
+  letter-spacing: .03em;
+}
+
+/* ── 12. History bottom sheet ────────────────────────────── */
+#history-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.75);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+#history-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#history-panel {
+  background: var(--surface-2);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  width: 100%;
+  max-height: 75vh;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-mid);
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.32,.72,0,1);
+}
+#history-overlay.open #history-panel { transform: translateY(0); }
+
+#history-header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#history-header h2 {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -.3px;
+  color: var(--text);
+}
+
+/* Close button uses theme .btn-secondary — just needs dark override */
+#history-close {
+  background: var(--surface-3);
+  border: 1px solid var(--border-mid);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .15s;
+}
+#history-close:hover { background: var(--surface-4); }
+
+#history-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* History item uses .card structure, dark override */
+.history-item {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* Body row: thumbnail left + content right */
+.history-item-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.history-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Vehicle thumbnail in history */
+.history-vehicle-thumb {
+  width: 72px;
+  height: 54px;
+  border-radius: 8px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border: 1px solid var(--border-mid);
+  background: transparent;
+}
+
+.history-vehicle-thumb-default {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-3);
+}
+
+.history-vehicle-thumb-default svg {
+  width: 34px;
+  height: 34px;
+  color: #94a3b8;
+}
+
+.history-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.history-item-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.history-item-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.history-item-stats {
+  display: flex;
+  gap: 16px;
+}
+.history-stat { display: flex; flex-direction: column; gap: 1px; }
+.history-stat-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.history-stat-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.history-item-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+/* Export / delete buttons — use theme .btn-secondary pattern, dark */
+.export-btn {
+  background: transparent;
+  border: 1px solid var(--border-mid);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+  touch-action: manipulation;
+}
+.export-btn:hover { border-color: var(--brand); color: var(--brand); }
+.export-btn.delete-btn { color: #ef4444; border-color: #ef4444; }
+.export-btn.delete-btn:hover { background: rgba(239,68,68,.1); }
+
+.empty-history {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 40px 0;
+}
+
+/* Map button — desktop only (hidden on small screens / phone mounts) */
+.map-view-btn { display: none; }
+@media (min-width: 640px) {
+  .map-view-btn { display: inline-flex; }
+}
+
+/* ── 13. SW update toast ─────────────────────────────────── */
+#update-toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface-3);
+  border: 1px solid var(--border-mid);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s, transform .3s;
+  white-space: nowrap;
+}
+#update-toast.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Update button uses theme .btn-primary style */
+#update-reload-btn {
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s;
+}
+#update-reload-btn:hover { background: var(--brand-dark); }
+
+/* ── 14. GPS accuracy badge ──────────────────────────────── */
+#accuracy-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  background: rgba(0,0,0,.7);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+/* ── 15. Login overlay ───────────────────────────────────── */
+/*
+   Full-screen overlay shown before sign-in.
+   Matches FuelTracker's login card design: centered white card,
+   logo, Google button, privacy footnote.
+   Uses .auth-hidden to toggle visibility so CSS transitions work.
+*/
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);   /* slate-50 */
+  padding: 24px;
+  transition: opacity .3s;
+}
+.login-overlay.auth-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.login-card {
+  background: var(--surface-2);   /* white */
+  border: 1px solid var(--border-mid);
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.08);
+  padding: 36px 28px;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+}
+
+.login-logo-wrap {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* On the white login card, "Drive" must be dark (not white) */
+.login-card .logo { color: #1e293b; }   /* slate-800 */
+.login-card .logo span { color: var(--brand); }
+
+.login-subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* Google Sign-In button — matches FuelTracker exactly */
+.google-signin-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border-mid);
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  touch-action: manipulation;
+  min-height: 48px;
+}
+.google-signin-btn:hover  { background: var(--surface-3); border-color: #94a3b8; }
+.google-signin-btn:active { background: var(--surface-4); }
+
+.google-g { flex-shrink: 0; }
+
+.login-privacy {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0;
+}
+
+/* ── 16. Accessibility ───────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── 17. Hamburger dropdown menu ────────────────────────── */
+.nav-menu {
+  position: fixed;
+  top: var(--header-bottom, 56px);  /* set by JS after header measures itself */
+  right: 16px;
+  z-index: 150;
+  background: #1e293b;             /* slate-800 — matches header */
+  border: 1px solid #334155;       /* slate-700 */
+  border-radius: 14px;
+  min-width: 220px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.45);
+  overflow: hidden;
+  /* Animate in */
+  opacity: 0;
+  transform: scale(.95) translateY(-6px);
+  transform-origin: top right;
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events: none;
+}
+.nav-menu:not([hidden]) {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+/* hidden attribute overrides display — keep consistent */
+.nav-menu[hidden] { display: block !important; }   /* let opacity/transform handle visibility */
+
+.nav-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background .12s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.nav-menu-item:hover,
+.nav-menu-item:focus-visible {
+  background: rgba(255,255,255,.07);
+}
+.nav-menu-item:active { background: rgba(255,255,255,.12); }
+
+.nav-menu-icon {
+  font-size: 20px;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.nav-menu-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f1f5f9;   /* slate-100 */
+  flex: 1;
+}
+
+.nav-menu-sub {
+  font-size: 11px;
+  color: #64748b;   /* slate-500 */
+  white-space: nowrap;
+}
+
+.nav-menu-divider {
+  height: 1px;
+  background: #334155;   /* slate-700 */
+  margin: 0 16px;
+}
+
+/* Spin the sync emoji while syncing */
+#menu-sync-btn.syncing .sync-icon {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Invisible full-screen backdrop — tapping it closes the menu */
+.nav-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 149;
+}
+.nav-menu-backdrop[hidden] { display: none !important; }
+
+/* ── 18. Settings bottom sheet ───────────────────────────── */
+/*
+   Matches the FuelTracker design language:
+   bg-white rounded-2xl border border-slate-200 shadow-sm cards,
+   text-xs uppercase tracking-wider section headers,
+   .form-input / .form-label theme classes throughout.
+*/
+
+#settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+#settings-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#settings-panel {
+  background: var(--surface);   /* slate-50 — matches body */
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  width: 100%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-mid);
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.32,.72,0,1);
+  overflow: hidden;
+}
+#settings-overlay.open #settings-panel { transform: translateY(0); }
+
+/* Both views fill the panel height and scroll independently.
+   Use .settings-hidden (not Tailwind .hidden) to hide — the ID-selector
+   display:flex would beat Tailwind's class-level display:none otherwise. */
+#settings-list-view,
+#settings-form-view {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+#settings-list-view.hidden,
+#settings-form-view.hidden {
+  display: none !important;
+}
+
+/* ── Sheet header (title + close/cancel) ─────────────────── */
+.settings-sheet-header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-mid);
+  flex-shrink: 0;
+  background: var(--surface-2);   /* white */
+}
+
+.settings-sheet-title {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -.3px;
+  color: var(--text);
+}
+
+.settings-sheet-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+
+.settings-close-btn {
+  background: var(--surface-3);
+  border: 1px solid var(--border-mid);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+.settings-close-btn:hover { background: var(--surface-4); }
+
+.settings-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-mid);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
+}
+.settings-back-btn:hover { background: var(--surface-4); color: var(--text); }
+
+/* ── Vehicles section (list view) ────────────────────────── */
+.settings-section {
+  overflow-y: auto;
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.settings-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s;
+  touch-action: manipulation;
+}
+.settings-add-btn:hover { background: var(--brand-dark); }
+
+/* ── Vehicle card ────────────────────────────────────────── */
+.vehicle-card {
+  background: var(--surface-2);   /* white */
+  border: 1px solid var(--border-mid);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+
+.vehicle-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+/* Thumbnail — photo or default car icon */
+.vehicle-card-thumb {
+  width: 56px;
+  height: 42px;
+  border-radius: 8px;
+  object-fit: contain;   /* contain (not cover) so transparent images aren't cropped */
+  flex-shrink: 0;
+  border: 1px solid var(--border-mid);
+  background: transparent;
+}
+
+.vehicle-card-thumb-default {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-3);
+}
+
+.vehicle-card-thumb-default svg {
+  width: 28px;
+  height: 28px;
+  color: #94a3b8;   /* slate-400 */
+}
+
+.vehicle-card-text { flex: 1; min-width: 0; }
+
+.vehicle-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vehicle-card-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+
+.vehicle-card-notes {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 3px 0 0;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vehicle-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.vehicle-edit-btn,
+.vehicle-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-mid);
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+  touch-action: manipulation;
+}
+.vehicle-edit-btn svg,
+.vehicle-delete-btn svg { width: 15px; height: 15px; }
+
+.vehicle-edit-btn {
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+.vehicle-edit-btn:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
+}
+
+.vehicle-delete-btn {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+.vehicle-delete-btn:hover { background: #fee2e2; }
+
+/* ── Empty state (vehicle list) ──────────────────────────── */
+.settings-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px;
+  gap: 8px;
+}
+.settings-empty-icon {
+  width: 48px;
+  height: 48px;
+  color: #cbd5e1;   /* slate-300 */
+}
+.settings-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+.settings-empty-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ── Form view ───────────────────────────────────────────── */
+.settings-form-scroll {
+  overflow-y: auto;
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* FuelTracker-style sectioned card */
+.settings-form-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border-mid);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 1px;   /* hairline gap between sections */
+}
+/* Middle sections lose their adjacent-side radii for a segmented look */
+.settings-form-card + .settings-form-card {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: 0;
+}
+.settings-form-card:not(:last-of-type) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.settings-form-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+}
+
+.settings-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.settings-form-field:last-child { margin-bottom: 0; }
+
+.settings-form-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.settings-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* Override theme .form-input / .form-label for light surface */
+.settings-form-card .form-label {
+  color: var(--text) !important;
+}
+.settings-form-card .form-input {
+  background: var(--surface) !important;
+  border-color: var(--border-mid) !important;
+  color: var(--text) !important;
+  font-size: 16px !important;   /* prevent iOS auto-zoom */
+}
+.settings-form-card .form-input:focus {
+  border-color: transparent !important;
+  box-shadow: 0 0 0 2px rgba(249,115,22,.4) !important;
+}
+
+/* Footer with Save / Cancel */
+.settings-form-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+/* ── Photo upload zone (inside settings form) ────────────── */
+.v-photo-upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  max-height: 140px;
+  padding: 24px 16px;
+  border: 2px dashed var(--border-mid);
+  border-radius: 12px;
+  cursor: pointer;
+  background: var(--surface);
+  transition: border-color .15s, background .15s;
+  touch-action: manipulation;
+  box-sizing: border-box;
+}
+.v-photo-upload-zone:hover {
+  border-color: var(--brand);
+  background: #fff7ed;
+}
+
+.v-photo-upload-icon {
+  width: 36px;
+  height: 36px;
+  color: #cbd5e1;
+}
+.v-photo-upload-zone:hover .v-photo-upload-icon { color: var(--brand); }
+
+.v-photo-upload-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.v-photo-upload-zone:hover .v-photo-upload-text { color: var(--brand-dark); }
+
+.v-photo-upload-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Photo preview (after image selected / existing photo) */
+.v-photo-preview-zone {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: 12px;
+}
+.v-photo-preview-zone.hidden { display: none !important; }
+
+.v-photo-preview-img {
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-mid);
+}
+
+.v-photo-preview-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.v-photo-change-btn,
+.v-photo-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background .15s;
+}
+
+.v-photo-change-btn {
+  background: var(--surface-3);
+  border: 1px solid var(--border-mid);
+  color: var(--text);
+  text-decoration: none;
+}
+.v-photo-change-btn:hover { background: var(--surface-4); }
+
+.v-photo-remove-btn {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+.v-photo-remove-btn:hover { background: #fee2e2; }
+
+/* ─────────────────────────────────────────────────────────── */
+.settings-save-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 14px !important;
+  border-radius: 12px !important;
+  font-size: 15px !important;
+}
+
+.settings-cancel-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 14px !important;
+  border-radius: 12px !important;
+  font-size: 15px !important;
+}
