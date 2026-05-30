@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-05-30
+
+### Added
+
+#### About Modal
+- New **About** entry in the hamburger menu (ℹ️)
+- Floating modal displaying the app icon, DriveTracker title, brief description, current version, and a **View Changelog** link to GitHub
+- Version number sourced from `APP_VERSION` constant in `app.js` — single place to update per release
+- Dismisses via ✕ button or tapping outside the modal
+
+---
+
 ## [1.1.0] - 2026-05-30
 
 ### Added

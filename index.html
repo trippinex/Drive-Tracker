@@ -31,7 +31,7 @@
                  .btn-primary .btn-secondary .btn-danger
                  .nav-link .card .form-input .form-label .form-select
                  .alert-success .alert-error -->
-  <link rel="stylesheet" href="/ui-theme/theme.css?v=18" />
+  <link rel="stylesheet" href="/ui-theme/theme.css?v=19" />
 
   <!-- Tailwind CSS (CDN) extended with the theme's brand palette -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -59,7 +59,7 @@
   </script>
 
   <!-- DriveTracker custom styles -->
-  <link rel="stylesheet" href="/styles.css?v=18" />
+  <link rel="stylesheet" href="/styles.css?v=19" />
 </head>
 
 <!-- overflow handled in styles.css via dvh; removed from class to not clip iOS safe-area -->
@@ -130,6 +130,12 @@
       <span class="nav-menu-icon sync-icon">🔄</span>
       <span class="nav-menu-label">Sync</span>
       <span class="nav-menu-sub">Sync data with cloud</span>
+    </button>
+    <div class="nav-menu-divider"></div>
+    <button id="menu-about-btn" class="nav-menu-item" role="menuitem">
+      <span class="nav-menu-icon">ℹ️</span>
+      <span class="nav-menu-label">About</span>
+      <span class="nav-menu-sub">About this app</span>
     </button>
     <div class="nav-menu-divider"></div>
     <button id="menu-settings-btn" class="nav-menu-item" role="menuitem">
@@ -399,6 +405,39 @@
   </div><!-- /settings-overlay -->
 
   <!-- ══════════════════════════════════════════════════
+       ABOUT MODAL
+       ══════════════════════════════════════════════════ -->
+  <div id="about-overlay" class="about-overlay" role="dialog" aria-modal="true" aria-label="About DriveTracker">
+    <div class="about-panel">
+
+      <button id="about-close" class="about-close-btn" aria-label="Close">✕</button>
+
+      <img src="/icons/icon-v2-192.png" alt="DriveTracker" class="about-icon" />
+
+      <div class="logo about-logo">Drive<span>Tracker</span></div>
+
+      <p class="about-description">
+        Real-time GPS route tracking and telemetry for car enthusiasts.
+        Record drives, manage your garage, and sync your history across all your devices.
+      </p>
+
+      <div class="about-divider"></div>
+
+      <div class="about-version-row">
+        <span class="about-version-label">Version</span>
+        <span id="about-version" class="about-version-value">v1.1.0</span>
+      </div>
+
+      <a href="https://github.com/trippinex/Drive-Tracker/blob/main/CHANGELOG.md"
+         target="_blank" rel="noopener noreferrer"
+         class="about-changelog-btn">
+        View Changelog →
+      </a>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
        SW UPDATE TOAST
        ══════════════════════════════════════════════════ -->
   <div id="update-toast" role="alert">
@@ -449,7 +488,7 @@
        SCRIPTS
        ══════════════════════════════════════════════════ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/app.js?v=18"></script>
+  <script src="/app.js?v=19"></script>
 
   <!-- Firebase SDKs (compat build — no bundler needed) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>

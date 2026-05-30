@@ -734,7 +734,129 @@ body {
   pointer-events: none;
 }
 
-/* ── 15. Login overlay ───────────────────────────────────── */
+/* ── 15. About modal ─────────────────────────────────────── */
+.about-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+.about-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.about-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border-mid);
+  border-radius: 20px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.18);
+  padding: 36px 28px 28px;
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+  transform: scale(.95);
+  transition: transform .25s cubic-bezier(.32,.72,0,1);
+}
+.about-overlay.open .about-panel { transform: scale(1); }
+
+.about-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-mid);
+  color: var(--text-muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s;
+}
+.about-close-btn:hover { background: var(--surface-4); color: var(--text); }
+
+.about-icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15);
+}
+
+.about-logo {
+  font-size: 24px !important;
+  letter-spacing: -0.5px;
+}
+/* On light card background, "Drive" must be dark */
+.about-logo { color: #1e293b !important; }
+.about-logo span { color: var(--brand) !important; }
+
+.about-description {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.about-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--border-mid);
+}
+
+.about-version-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 4px;
+}
+.about-version-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.about-version-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.about-changelog-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--brand);
+  color: #fff;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: 10px;
+  width: 100%;
+  justify-content: center;
+  transition: background .15s;
+  touch-action: manipulation;
+}
+.about-changelog-btn:hover { background: var(--brand-dark); }
+
+/* ── 16. Login overlay ───────────────────────────────────── */
 /*
    Full-screen overlay shown before sign-in.
    Matches FuelTracker's login card design: centered white card,

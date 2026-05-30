@@ -15,6 +15,9 @@
 
 'use strict';
 
+// Current app version — update this with every release.
+const APP_VERSION = '1.2.0';
+
 // ═══════════════════════════════════════════════════════════════
 // 1. IndexedDB wrapper
 // ═══════════════════════════════════════════════════════════════
@@ -1182,6 +1185,22 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu();
 document.getElementById('menu-history-btn')?.addEventListener('click', () => {
   closeMenu();
   openHistory();
+});
+
+document.getElementById('menu-about-btn')?.addEventListener('click', () => {
+  closeMenu();
+  document.getElementById('about-version').textContent = `v${APP_VERSION}`;
+  document.getElementById('about-overlay').classList.add('open');
+});
+
+document.getElementById('about-close')?.addEventListener('click', () => {
+  document.getElementById('about-overlay').classList.remove('open');
+});
+
+document.getElementById('about-overlay')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('about-overlay')) {
+    document.getElementById('about-overlay').classList.remove('open');
+  }
 });
 
 document.getElementById('menu-sync-btn')?.addEventListener('click', async () => {
