@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version number sourced from `APP_VERSION` constant in `app.js` — single place to update per release
 - Dismisses via ✕ button or tapping outside the modal
 
+### Changed
+
+#### Garage (formerly Settings)
+- **Settings** renamed to **Garage** throughout the UI — menu label, panel title, status messages, and empty-state text
+- Hamburger menu Garage item now displays a branded orange garage SVG icon (peaked roof + door panels) replacing the generic gear icon
+- Garage panel header shows the same orange garage icon to the left of the title for visual consistency
+
 ---
 
 ## [1.1.0] - 2026-05-30
