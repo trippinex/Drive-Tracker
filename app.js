@@ -15,6 +15,9 @@
 
 'use strict';
 
+// Current app version — update this with every release.
+const APP_VERSION = '1.2.0';
+
 // ═══════════════════════════════════════════════════════════════
 // 1. IndexedDB wrapper
 // ═══════════════════════════════════════════════════════════════
@@ -754,7 +757,7 @@ async function startDrive() {
   if (!selectedVehicle) {
     const vehicles = await getAllVehicles();
     if (!vehicles.length) {
-      setStatus('No vehicles configured. Add one in Menu → Settings before starting a drive.');
+      setStatus('No vehicles configured. Add one in Menu → Garage before starting a drive.');
     } else {
       setStatus('Please select a vehicle before starting a drive.');
     }
@@ -1184,6 +1187,22 @@ document.getElementById('menu-history-btn')?.addEventListener('click', () => {
   openHistory();
 });
 
+document.getElementById('menu-about-btn')?.addEventListener('click', () => {
+  closeMenu();
+  document.getElementById('about-version').textContent = `v${APP_VERSION}`;
+  document.getElementById('about-overlay').classList.add('open');
+});
+
+document.getElementById('about-close')?.addEventListener('click', () => {
+  document.getElementById('about-overlay').classList.remove('open');
+});
+
+document.getElementById('about-overlay')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('about-overlay')) {
+    document.getElementById('about-overlay').classList.remove('open');
+  }
+});
+
 document.getElementById('menu-sync-btn')?.addEventListener('click', async () => {
   closeMenu();
   if (typeof window.syncOnSignIn !== 'function') {
@@ -1226,7 +1245,7 @@ async function populateVehicleDropdown() {
 
   if (!vehicles.length) {
     const opt = document.createElement('option');
-    opt.value = ''; opt.textContent = 'No vehicles — add one in Settings';
+    opt.value = ''; opt.textContent = 'No vehicles — add one in Garage';
     select.appendChild(opt);
     updateVehiclePhoto('');
     return;
