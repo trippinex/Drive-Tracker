@@ -20,11 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Minimum 2-second time gate** — both distance AND time must be satisfied to record a point; prevents GPS jitter bursts at stops
 - **Ramer-Douglas-Peucker simplification at save time** — removes collinear points within 10m of straight-line segments before storage; turns and curves fully preserved; typical 20–40% reduction on highway sections
 
-#### Analysis basis
-Drive 1 (pre-fix): 11.09 mi → 1,555 pts @ 140 pts/mile  
-Drive 2 (post-fix): 27.08 mi → 1,138 pts @ 42 pts/mile  
-Projected 3-hour suburban drive: ~4,000 pts (was ~11,200 without these changes)
-
 ---
 
 ## [1.0.0] - 2026-05-30
