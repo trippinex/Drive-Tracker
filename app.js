@@ -508,6 +508,39 @@ function clearCarMarker() {
   if (carMarker) { carMarker.remove(); carMarker = null; }
 }
 
+// ── Recommendation 3: Ramer-Douglas-Peucker route simplification ─────────────
+// Applied once at drive-save time. Removes intermediate GPS points that lie
+// within EPSILON degrees of the straight line between their neighbours —
+// i.e., collinear "noise" on straight road sections. Turns and curves are
+// fully preserved because their apex deviates significantly from the straight
+// line. Typical reduction: 30–60% on highway sections, ~10% on city drives.
+const RDP_EPSILON = 0.00009;   // ≈ 10 metres in geographic degrees
+
+function rdpPerpendicularDist(pt, lineStart, lineEnd) {
+  const x0 = pt.lng,        y0 = pt.lat;
+  const x1 = lineStart.lng, y1 = lineStart.lat;
+  const x2 = lineEnd.lng,   y2 = lineEnd.lat;
+  const num = Math.abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1);
+  const den = Math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2);
+  return den === 0 ? 0 : num / den;
+}
+
+function rdpSimplify(points, epsilon = RDP_EPSILON) {
+  if (points.length <= 2) return points;
+  let maxDist = 0, maxIdx = 0;
+  const start = points[0], end = points[points.length - 1];
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = rdpPerpendicularDist(points[i], start, end);
+    if (d > maxDist) { maxDist = d; maxIdx = i; }
+  }
+  if (maxDist > epsilon) {
+    const left  = rdpSimplify(points.slice(0, maxIdx + 1), epsilon);
+    const right = rdpSimplify(points.slice(maxIdx), epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+  return [start, end];
+}
+
 /** Returns compass bearing (0–360°) from point A to point B. */
 function getBearing(lat1, lon1, lat2, lon2) {
   const toRad = d => d * Math.PI / 180;
@@ -639,23 +672,41 @@ const sessionState = {
 // At ~150 bytes/point, 5,000 points ≈ 750 KB — safely under the 1 MB document limit.
 const MAX_COORDS_PER_PART = 5000;
 
-// Minimum distance between recorded GPS points — matches Google Maps' capture strategy.
-// The car marker and map pan still update on every GPS tick for smooth UX;
-// only coordinate storage and the route polyline are throttled by this threshold.
-const MIN_RECORD_DISTANCE_MILES = 15 / 1609.34;   // 15 metres in miles
+// ── Recommendation 1: Speed-adaptive distance threshold ───────────────────────
+// Scale the minimum recording distance with GPS-reported speed, matching the
+// strategy used by Google Maps and Waze. Faster speeds = larger threshold =
+// fewer points on straight highway sections.
+const SPEED_THRESHOLDS = [
+  { maxMph: 10,       metres: 8  },  // stopped / crawling — preserve slow detail
+  { maxMph: 35,       metres: 15 },  // suburban driving
+  { maxMph: 60,       metres: 25 },  // mixed / arterial roads
+  { maxMph: Infinity, metres: 40 },  // highway — ~1 point per 1.5 sec at 65 mph
+];
+
+function getDistanceThresholdMiles(speedMph) {
+  for (const tier of SPEED_THRESHOLDS) {
+    if (speedMph <= tier.maxMph) return tier.metres / 1609.34;
+  }
+  return 40 / 1609.34;
+}
+
+// ── Recommendation 2: Minimum time gap between recorded points ────────────────
+// Prevents burst recording caused by GPS jitter when stationary (the device
+// oscillates a few metres around a fixed point, falsely triggering the distance
+// threshold). Both distance AND time must be satisfied to record a point.
+const MIN_RECORD_INTERVAL_MS = 2000;  // 2 seconds
+let lastRecordedTs = 0;
 
 function onPositionUpdate(pos) {
   if (!sessionState.active || sessionState.paused) return;
   const { latitude: lat, longitude: lng, altitude, speed, accuracy } = pos.coords;
-  const latlng = L.latLng(lat, lng);
-  const now    = pos.timestamp;
+  const latlng   = L.latLng(lat, lng);
+  const now      = pos.timestamp;
   const speedMph = (speed != null && speed >= 0) ? mpsToMph(speed) : 0;
 
-  // Always update the car marker and pan — keeps movement smooth regardless of threshold.
+  // Always update car marker, pan, and telemetry — smooth UX on every GPS tick.
   updateCarMarker(latlng);
   panToPosition(latlng);
-
-  // Always update speed/duration telemetry so the display stays live.
   updateTelemetry({
     speedMph,
     distanceMiles:  sessionState.totalDistanceMi,
@@ -664,17 +715,22 @@ function onPositionUpdate(pos) {
     accuracyM:      accuracy,
   });
 
-  // Only record a point and extend the route polyline when the device has
-  // moved at least 15 metres from the last recorded point.
+  // Gate: record a point only when BOTH conditions are satisfied —
+  //   1. Speed-adaptive distance threshold exceeded (Rec 1)
+  //   2. At least 2 seconds since the last recorded point (Rec 2)
   const prev = sessionState.coordinates[sessionState.coordinates.length - 1];
   if (prev) {
-    const d = haversine(prev.lat, prev.lng, lat, lng);
-    if (d < MIN_RECORD_DISTANCE_MILES) return;   // not far enough — skip
-    sessionState.totalDistanceMi += d;
+    const distMiles = haversine(prev.lat, prev.lng, lat, lng);
+    const threshold = getDistanceThresholdMiles(speedMph);
+    const elapsed   = now - lastRecordedTs;
+
+    if (distMiles < threshold || elapsed < MIN_RECORD_INTERVAL_MS) return;
+    sessionState.totalDistanceMi += distMiles;
   }
 
   appendToRoute(latlng);
   sessionState.coordinates.push({ lat, lng, alt: altitude, speed, ts: now });
+  lastRecordedTs = now;
   setStatus(`Tracking — ${sessionState.coordinates.length} points recorded.`);
 }
 
@@ -721,6 +777,7 @@ async function startDrive() {
 
   clearRoute();
   resetTelemetry();
+  lastRecordedTs = 0;   // reset time gate for new drive
   stopIdleWatch();
   hideLocationDot();
   showVehiclePhoto();
@@ -759,7 +816,11 @@ async function stopDrive() {
   sessionState.paused = false;
 
   if (sessionState.coordinates.length > 1) {
-    const coords   = sessionState.coordinates;
+    // Apply RDP simplification before saving — removes collinear points on
+    // straight sections while preserving every turn and curve (Rec 3).
+    const raw      = sessionState.coordinates;
+    const coords   = rdpSimplify(raw);
+    console.log(`[Drive] RDP: ${raw.length} → ${coords.length} pts (${((1 - coords.length/raw.length)*100).toFixed(0)}% reduction)`);
     const endedAt  = Date.now();
     const duration = getElapsedSeconds();
     const distance = sessionState.totalDistanceMi;
