@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.1] - 2026-05-31
+
+### Fixed
+
+#### Long-Drive Stability
+- **Iterative RDP** — converted Ramer-Douglas-Peucker simplification from recursive to iterative, eliminating JavaScript stack overflow on drives producing 8,000+ raw GPS points (8-hour drives)
+- **GPS gap detection** — warns in the status bar if GPS updates stop for ≥ 60 seconds mid-drive (e.g. iOS background suspension); counts and reports total gaps per session
+- **Wake lock heartbeat** — re-acquires screen wake lock every 5 minutes during active recording; warns immediately in status bar when the lock drops mid-drive
+- **Leaflet arrow marker cap** — limits direction chevrons to 200 live DOM elements (removes oldest when cap is hit); prevents progressive map lag on drives 1+ hours long
+- **Rolling in-drive chunk flush** — when the coordinate buffer reaches 5,000 points mid-drive, flushes to IndexedDB and clears memory rather than holding the full array until stop; makes 8-hour drives memory-safe on mobile
+- **Secret management** — moved Firebase API key, auth domain, and allowed email out of source code into GCP Secret Manager; runtime config injected via `config.js` (never committed)
+
+#### Validated
+Validated against three recorded drives showing 94.8% reduction in stored GPS points per mile compared to the original time-based recording system, with no loss of route quality.
+
+---
+
 ## [1.2.0] - 2026-05-30
 
 ### Added

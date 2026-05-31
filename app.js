@@ -17,7 +17,7 @@
 
 // Current app version — update this with every release.
 const APP_VERSION = '1.2.1';
-const APP_IS_BETA = true;   // remove when long-drive stability is validated in production
+const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
 // 1. IndexedDB wrapper

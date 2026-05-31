@@ -12,24 +12,7 @@ Update this file when a feature moves from one stage to the next.
 | v1.0.0 | Initial release — GPS tracking, Leaflet map, vehicle garage, Firestore sync, Firebase Auth |
 | v1.1.0 | GPS recording improvements — speed-adaptive threshold, 2s time gate, RDP simplification |
 | v1.2.0 | About modal, Settings → Garage rename, garage icon |
-
----
-
-## 🔄 In Progress — Awaiting Validation
-
-### v1.2.1 (beta) — Long-Drive Stability
-**Branch:** `fix/long-drive-stability` (local only — not yet on GitHub)
-**Status:** Deployed to GCP. Needs a real 3-hour+ drive to validate before promoting.
-
-> ⚠️ **Reminder: Promote `fix/long-drive-stability` to GitHub BEFORE starting the AI Drive Analysis feature.**
-
-Fixes included:
-- Iterative RDP (eliminates stack overflow on 8-hr drives)
-- GPS gap detection (60s threshold, status bar warning)
-- Wake lock 5-min heartbeat + warning on drop
-- Arrow marker cap (200 max, trailing effect)
-- Rolling in-drive chunk flush (memory safe for 8-hr drives)
-- Beta designation in About modal
+| v1.2.1 | Long-drive stability — iterative RDP, GPS gap detection, wake lock heartbeat, arrow cap, rolling flush, secret management |
 
 ---
 
