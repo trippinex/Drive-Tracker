@@ -15,9 +15,9 @@
 // v3: evicts the old shell that still contained app.js with seedDefaultVehicles().
 // Any device running the v2 shell was serving stale app.js which re-seeded
 // the default vehicles on every fresh IndexedDB, regardless of the DB v3 migration.
-const SHELL_CACHE   = 'DriveTracker-shell-v21';
-const CDN_CACHE     = 'DriveTracker-cdn-v21';
-const TILE_CACHE    = 'DriveTracker-tiles-v21';
+const SHELL_CACHE   = 'DriveTracker-shell-v24';
+const CDN_CACHE     = 'DriveTracker-cdn-v24';
+const TILE_CACHE    = 'DriveTracker-tiles-v24';
 const MAX_TILES     = 2000;   // tile entries cap (~50 MB at avg 25 KB/tile)
 const MAX_TILE_AGE  = 7 * 24 * 60 * 60 * 1000;  // 7 days in ms
 
@@ -28,10 +28,10 @@ const MAX_TILE_AGE  = 7 * 24 * 60 * 60 * 1000;  // 7 days in ms
 // cache.addAll() fails the entire SW install if ANY asset returns non-200.
 const SHELL_ASSETS = [
   '/index.html',
-  '/app.js?v=20',
-  '/styles.css?v=20',
+  '/app.js?v=23',
+  '/styles.css?v=23',
   '/manifest.json',
-  '/ui-theme/theme.css?v=20',
+  '/ui-theme/theme.css?v=23',
 ];
 
 // Third-party CDN assets we want cached for full offline use.
@@ -93,7 +93,9 @@ self.addEventListener('fetch', event => {
   // index.html and auth.js — network-first so deployments are visible immediately.
   // These files are served with no-cache headers; the SW must not override that
   // with a stale cached copy or users would be stuck on old HTML/auth code.
-  if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/auth.js') {
+  // config.js contains injected secrets — must never be served from SW cache.
+  if (url.pathname === '/' || url.pathname === '/index.html' ||
+      url.pathname === '/auth.js' || url.pathname === '/config.js') {
     event.respondWith(networkFirst(request, SHELL_CACHE));
     return;
   }

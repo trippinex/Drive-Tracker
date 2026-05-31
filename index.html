@@ -31,7 +31,7 @@
                  .btn-primary .btn-secondary .btn-danger
                  .nav-link .card .form-input .form-label .form-select
                  .alert-success .alert-error -->
-  <link rel="stylesheet" href="/ui-theme/theme.css?v=20" />
+  <link rel="stylesheet" href="/ui-theme/theme.css?v=23" />
 
   <!-- Tailwind CSS (CDN) extended with the theme's brand palette -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -59,7 +59,7 @@
   </script>
 
   <!-- DriveTracker custom styles -->
-  <link rel="stylesheet" href="/styles.css?v=20" />
+  <link rel="stylesheet" href="/styles.css?v=23" />
 </head>
 
 <!-- overflow handled in styles.css via dvh; removed from class to not clip iOS safe-area -->
@@ -505,7 +505,7 @@
        SCRIPTS
        ══════════════════════════════════════════════════ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/app.js?v=20"></script>
+  <script src="/app.js?v=23"></script>
 
   <!-- Firebase SDKs (compat build — no bundler needed) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -514,6 +514,10 @@
 
   <!-- Sync engine — must load after app.js (uses its DB helpers) -->
   <script src="/sync.js?v=1"></script>
+
+  <!-- Runtime config — injected secrets, never committed to source control.
+       Must load before auth.js. Generated from .env locally or Secret Manager in CI. -->
+  <script src="/config.js"></script>
 
   <!-- Auth — must load last (calls initApp and initSync after sign-in) -->
   <script src="/auth.js?v=3"></script>

@@ -16,7 +16,8 @@
 'use strict';
 
 // Current app version — update this with every release.
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
+const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
 // 1. IndexedDB wrapper
@@ -298,6 +299,36 @@ window.deleteDriveByLocalId = async function deleteDriveByLocalId(localId) {
   });
 };
 
+// Fix 5: Save a drive record to IndexedDB only (no Firestore sync).
+// Used for rolling mid-drive chunks so partial data doesn't pollute Firestore.
+// The complete, finalised records are synced to Firestore at stopDrive().
+async function saveDriveLocal(record) {
+  const db      = await openDB();
+  const payload = { ...record, userId: currentUserId };
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(DRIVES_STORE, 'readwrite');
+    const req = tx.objectStore(DRIVES_STORE).add(payload);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+// Fix 5: Patch specific fields on an existing drive record (local only).
+// Called at stopDrive() to finalise endedAt/distanceMiles/totalParts on rolled chunks.
+async function updateDriveById(localId, fields) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(DRIVES_STORE, 'readwrite');
+    const store = tx.objectStore(DRIVES_STORE);
+    const get   = store.get(localId);
+    get.onsuccess = () => {
+      if (!get.result) return resolve();
+      store.put({ ...get.result, ...fields }).onsuccess = resolve;
+    };
+    get.onerror = () => reject(get.error);
+  });
+}
+
 window.setVehicleFirestoreId = async function setVehicleFirestoreId(localId, firestoreId) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -446,6 +477,7 @@ let idleWatchId   = null;
 let arrowMarkers  = [];     // directional chevrons placed along the route
 let arrowStepCount = 0;     // counts GPS points between arrow placements
 const ARROW_EVERY  = 8;     // place one arrow every N GPS points
+const MAX_ARROWS   = 200;   // Fix 4: cap arrow markers to prevent DOM bloat on long drives
 
 function initMap() {
   if (map) return;
@@ -528,20 +560,36 @@ function rdpPerpendicularDist(pt, lineStart, lineEnd) {
   return den === 0 ? 0 : num / den;
 }
 
+// Fix 1: Iterative RDP — eliminates recursion stack overflow on large arrays.
+// The recursive version could throw RangeError on 8-hour drives (14,000+ points).
+// This iterative version uses an explicit stack array with identical output.
 function rdpSimplify(points, epsilon = RDP_EPSILON) {
   if (points.length <= 2) return points;
-  let maxDist = 0, maxIdx = 0;
-  const start = points[0], end = points[points.length - 1];
-  for (let i = 1; i < points.length - 1; i++) {
-    const d = rdpPerpendicularDist(points[i], start, end);
-    if (d > maxDist) { maxDist = d; maxIdx = i; }
+
+  const keep  = new Uint8Array(points.length);  // 1 = keep, 0 = discard
+  keep[0] = 1;
+  keep[points.length - 1] = 1;
+
+  const stack = [[0, points.length - 1]];
+
+  while (stack.length) {
+    const [start, end] = stack.pop();
+    if (end - start <= 1) continue;
+
+    let maxDist = 0, maxIdx = start;
+    for (let i = start + 1; i < end; i++) {
+      const d = rdpPerpendicularDist(points[i], points[start], points[end]);
+      if (d > maxDist) { maxDist = d; maxIdx = i; }
+    }
+
+    if (maxDist > epsilon) {
+      keep[maxIdx] = 1;
+      stack.push([start, maxIdx]);
+      stack.push([maxIdx, end]);
+    }
   }
-  if (maxDist > epsilon) {
-    const left  = rdpSimplify(points.slice(0, maxIdx + 1), epsilon);
-    const right = rdpSimplify(points.slice(maxIdx), epsilon);
-    return [...left.slice(0, -1), ...right];
-  }
-  return [start, end];
+
+  return points.filter((_, i) => keep[i] === 1);
 }
 
 /** Returns compass bearing (0–360°) from point A to point B. */
@@ -554,8 +602,13 @@ function getBearing(lat1, lon1, lat2, lon2) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
-/** Place a direction chevron on the map at [lat2, lon2] pointing from A→B. */
+/** Place a direction chevron on the map at [lat2, lon2] pointing from A→B.
+ *  Fix 4: removes the oldest arrow when MAX_ARROWS is reached so the DOM
+ *  doesn't accumulate thousands of markers on 8-hour drives. */
 function addDirectionArrow(lat1, lon1, lat2, lon2) {
+  if (arrowMarkers.length >= MAX_ARROWS) {
+    arrowMarkers.shift().remove();   // evict oldest — trailing-arrows effect
+  }
   const bearing = getBearing(lat1, lon1, lat2, lon2);
   const icon = L.divIcon({
     className: '',
@@ -612,6 +665,10 @@ async function acquireWakeLock() {
     wakeLock.addEventListener('release', () => {
       document.getElementById('wakelock-status').classList.remove('active');
       wakeLock = null;
+      // Fix 3: warn the driver if the lock drops mid-recording
+      if (sessionState.active) {
+        setStatus('⚠️ Screen lock lost — screen may dim during drive.');
+      }
     });
   } catch (err) {
     console.warn('Wake Lock request failed:', err.message);
@@ -669,7 +726,19 @@ const sessionState = {
   startTime: null, pausedAt: null, totalPausedMs: 0,
   coordinates: [], totalDistanceMi: 0,
   timerInterval: null, vehicle: '',
+  // Fix 5: rolling in-drive chunk flush
+  flushedPartIds: [],   // local IndexedDB IDs of parts saved mid-drive
+  driveGroupId:   null, // set on first flush; links all parts together
+  isFlushing:     false, // prevents concurrent flush operations
 };
+
+// Fix 2: GPS gap detection
+const GPS_GAP_THRESHOLD_MS = 60_000;  // 60 seconds
+let lastGPSTimestamp = 0;
+let gapCount = 0;
+
+// Fix 3: Wake lock heartbeat
+let wakeLockHeartbeat = null;
 
 // Maximum GPS coordinates per drive part stored in Firestore.
 // At ~150 bytes/point, 5,000 points ≈ 750 KB — safely under the 1 MB document limit.
@@ -699,6 +768,47 @@ function getDistanceThresholdMiles(speedMph) {
 // threshold). Both distance AND time must be satisfied to record a point.
 const MIN_RECORD_INTERVAL_MS = 2000;  // 2 seconds
 let lastRecordedTs = 0;
+
+/**
+ * Fix 5: Flush the current coordinate buffer to IndexedDB as a partial part.
+ * Called mid-drive when the buffer reaches MAX_COORDS_PER_PART.
+ * Saves locally only (no Firestore sync) — finalised records sync at stopDrive().
+ * Clears sessionState.coordinates to free memory for the next chunk.
+ */
+async function flushDriveChunk() {
+  if (sessionState.coordinates.length < 2 || sessionState.isFlushing) return;
+  sessionState.isFlushing = true;
+
+  try {
+    const coords = rdpSimplify([...sessionState.coordinates]);
+
+    if (!sessionState.driveGroupId) {
+      sessionState.driveGroupId = String(sessionState.startTime);
+    }
+
+    const partNumber = sessionState.flushedPartIds.length + 1;
+    const id = await saveDriveLocal({
+      vehicle:         sessionState.vehicle,
+      startedAt:       sessionState.startTime,
+      endedAt:         null,   // finalised at stopDrive
+      durationSeconds: null,
+      distanceMiles:   null,
+      coordinates:     coords,
+      driveGroupId:    sessionState.driveGroupId,
+      partNumber,
+      totalParts:      null,   // finalised at stopDrive
+    });
+
+    sessionState.flushedPartIds.push(id);
+    sessionState.coordinates = [];  // free memory — this is the whole point
+    console.log(`[Drive] Chunk ${partNumber} flushed (${coords.length} pts after RDP). Memory cleared.`);
+    setStatus(`Tracking — chunk ${partNumber} saved, continuing…`);
+  } catch (err) {
+    console.error('[Drive] Chunk flush failed:', err.message);
+  } finally {
+    sessionState.isFlushing = false;
+  }
+}
 
 function onPositionUpdate(pos) {
   if (!sessionState.active || sessionState.paused) return;
@@ -731,10 +841,26 @@ function onPositionUpdate(pos) {
     sessionState.totalDistanceMi += distMiles;
   }
 
+  // Fix 2: GPS gap detection — warn if position updates stopped for >= 60 seconds.
+  if (lastGPSTimestamp > 0) {
+    const gap = now - lastGPSTimestamp;
+    if (gap >= GPS_GAP_THRESHOLD_MS) {
+      gapCount++;
+      setStatus(`⚠️ GPS gap detected (${Math.round(gap / 1000)}s). ${gapCount} gap${gapCount > 1 ? 's' : ''} this drive.`);
+    }
+  }
+  lastGPSTimestamp = now;
+
   appendToRoute(latlng);
   sessionState.coordinates.push({ lat, lng, alt: altitude, speed, ts: now });
   lastRecordedTs = now;
-  setStatus(`Tracking — ${sessionState.coordinates.length} points recorded.`);
+
+  // Fix 5: Trigger rolling flush when buffer reaches the chunk size.
+  if (sessionState.coordinates.length >= MAX_COORDS_PER_PART && !sessionState.isFlushing) {
+    flushDriveChunk();  // async fire-and-forget; clears coordinates on completion
+  } else {
+    setStatus(`Tracking — ${sessionState.coordinates.length} pts (chunk ${sessionState.flushedPartIds.length + 1}).`);
+  }
 }
 
 function onPositionError(err) {
@@ -780,11 +906,25 @@ async function startDrive() {
 
   clearRoute();
   resetTelemetry();
-  lastRecordedTs = 0;   // reset time gate for new drive
+  lastRecordedTs    = 0;   // reset time gate
+  lastGPSTimestamp  = 0;   // Fix 2: reset gap detector
+  gapCount          = 0;
+  sessionState.flushedPartIds = [];  // Fix 5: reset rolling flush state
+  sessionState.driveGroupId   = null;
+  sessionState.isFlushing     = false;
   stopIdleWatch();
   hideLocationDot();
   showVehiclePhoto();
   await acquireWakeLock();
+
+  // Fix 3: Wake lock heartbeat — re-acquire every 5 min in case OS revokes it.
+  wakeLockHeartbeat = setInterval(async () => {
+    if (!sessionState.active) return;
+    if (!wakeLock) {
+      await acquireWakeLock();
+      if (!wakeLock) setStatus('⚠️ Screen lock lost — screen may dim during drive.');
+    }
+  }, 5 * 60 * 1000);
 
   sessionState.watchId = navigator.geolocation.watchPosition(
     onPositionUpdate, onPositionError,
@@ -811,6 +951,8 @@ async function stopDrive() {
 
   clearInterval(sessionState.timerInterval);
   sessionState.timerInterval = null;
+  clearInterval(wakeLockHeartbeat);    // Fix 3: stop heartbeat
+  wakeLockHeartbeat = null;
   hideVehiclePhoto();
   await releaseWakeLock();
 
@@ -818,17 +960,51 @@ async function stopDrive() {
   sessionState.active = false;
   sessionState.paused = false;
 
-  if (sessionState.coordinates.length > 1) {
-    // Apply RDP simplification before saving — removes collinear points on
-    // straight sections while preserving every turn and curve (Rec 3).
-    const raw      = sessionState.coordinates;
-    const coords   = rdpSimplify(raw);
-    console.log(`[Drive] RDP: ${raw.length} → ${coords.length} pts (${((1 - coords.length/raw.length)*100).toFixed(0)}% reduction)`);
-    const endedAt  = Date.now();
-    const duration = getElapsedSeconds();
-    const distance = sessionState.totalDistanceMi;
+  const hasFlushedParts = sessionState.flushedPartIds.length > 0;
+  const endedAt  = Date.now();
+  const duration = getElapsedSeconds();
+  const distance = sessionState.totalDistanceMi;
 
-    // Split into parts if coordinate count exceeds MAX_COORDS_PER_PART.
+  if (hasFlushedParts) {
+    // Fix 5: Drive used rolling flush — finalise the remaining buffer and
+    // patch all flushed parts with the correct final metadata.
+    const raw    = sessionState.coordinates;
+    const coords = raw.length > 1 ? rdpSimplify(raw) : [];
+    if (coords.length > 1) console.log(`[Drive] Final chunk RDP: ${raw.length} → ${coords.length} pts`);
+
+    const totalParts = sessionState.flushedPartIds.length + (coords.length > 1 ? 1 : 0);
+    const driveGroupId = sessionState.driveGroupId;
+
+    // Save final (remaining) chunk if it has enough points.
+    if (coords.length > 1) {
+      await saveDrive({
+        vehicle:         sessionState.vehicle,
+        startedAt:       sessionState.startTime,
+        endedAt, durationSeconds: duration, distanceMiles: distance,
+        coordinates:     coords,
+        driveGroupId,
+        partNumber:      totalParts,
+        totalParts,
+      });
+    }
+
+    // Patch all previously flushed chunks with final metadata.
+    for (let i = 0; i < sessionState.flushedPartIds.length; i++) {
+      await updateDriveById(sessionState.flushedPartIds[i], {
+        endedAt, durationSeconds: duration, distanceMiles: distance,
+        totalParts,
+      });
+    }
+
+    setStatus(`Drive saved (${totalParts} parts, ${distance.toFixed(2)} mi).`);
+
+  } else if (sessionState.coordinates.length > 1) {
+    // Normal path — no rolling flush occurred.
+    const raw    = sessionState.coordinates;
+    const coords = rdpSimplify(raw);
+    console.log(`[Drive] RDP: ${raw.length} → ${coords.length} pts (${((1 - coords.length/raw.length)*100).toFixed(0)}% reduction)`);
+
+    // Split into parts if still over the chunk limit after RDP.
     const chunks = [];
     for (let i = 0; i < coords.length; i += MAX_COORDS_PER_PART) {
       chunks.push(coords.slice(i, i + MAX_COORDS_PER_PART));
@@ -838,24 +1014,18 @@ async function stopDrive() {
     const driveGroupId = isMultiPart ? String(sessionState.startTime) : undefined;
 
     for (let i = 0; i < chunks.length; i++) {
-      const record = {
+      await saveDrive({
         vehicle:         sessionState.vehicle,
         startedAt:       sessionState.startTime,
-        endedAt,
-        durationSeconds: duration,
-        distanceMiles:   distance,
+        endedAt, durationSeconds: duration, distanceMiles: distance,
         coordinates:     chunks[i],
-        ...(isMultiPart && {
-          driveGroupId,
-          partNumber: i + 1,
-          totalParts: chunks.length,
-        }),
-      };
-      await saveDrive(record);
+        ...(isMultiPart && { driveGroupId, partNumber: i + 1, totalParts: chunks.length }),
+      });
     }
 
     const partNote = isMultiPart ? ` (${chunks.length} parts)` : '';
     setStatus(`Drive saved (${coords.length} pts, ${distance.toFixed(2)} mi${partNote}).`);
+
   } else {
     setStatus('Drive cancelled — too few GPS points recorded.');
   }
@@ -1189,7 +1359,8 @@ document.getElementById('menu-history-btn')?.addEventListener('click', () => {
 
 document.getElementById('menu-about-btn')?.addEventListener('click', () => {
   closeMenu();
-  document.getElementById('about-version').textContent = `v${APP_VERSION}`;
+  const ver = APP_IS_BETA ? `v${APP_VERSION} (beta)` : `v${APP_VERSION}`;
+  document.getElementById('about-version').textContent = ver;
   document.getElementById('about-overlay').classList.add('open');
 });
 

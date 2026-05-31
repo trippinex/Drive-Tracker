@@ -13,6 +13,8 @@ Thumbs.db
 node_modules/
 npm-debug.log*
 
-# Local secrets (never commit auth config)
+# Runtime config and secrets — never commit
+config.js        # generated from .env locally or Secret Manager in CI
 *.env
+.env
 .env.*
