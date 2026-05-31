@@ -118,6 +118,7 @@ Example: 11.09 mi ÷ 32.4 MPG × $3.29/gal = $1.13
 | DT-009 | Strava / Garmin Connect export | Push completed drives to third-party fitness/activity platforms |
 | DT-010 | OBD-II Bluetooth integration | Pair with ELM327 dongle for real engine telemetry (RPM, boost, coolant temp) |
 | DT-011 | Group Drive / Convoy Mode | Multiple DriveTracker users share a real-time map during a group drive |
+| DT-012 | Drive History pagination & search | History panel currently loads all drives at once — add pagination, virtual scrolling, and date/vehicle filtering to keep the UI performant as the drive count grows into the hundreds |
 
 ---
 
