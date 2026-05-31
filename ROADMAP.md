@@ -119,6 +119,7 @@ Example: 11.09 mi ÷ 32.4 MPG × $3.29/gal = $1.13
 | DT-010 | OBD-II Bluetooth integration | Pair with ELM327 dongle for real engine telemetry (RPM, boost, coolant temp) |
 | DT-011 | Group Drive / Convoy Mode | Multiple DriveTracker users share a real-time map during a group drive |
 | DT-012 | Drive History pagination & search | History panel currently loads all drives at once — add pagination, virtual scrolling, and date/vehicle filtering to keep the UI performant as the drive count grows into the hundreds |
+| DT-013 | Pause and resume drive recording | Allow the driver to pause an active recording session (e.g. fuel stop, rest area) and resume without starting a new drive. GPS tracking and the timer halt on pause; the route polyline and all telemetry resume seamlessly on resume. Paused time is excluded from drive duration. The Stop Drive button becomes a Pause / Stop split control during an active session. |
 
 ---
 
