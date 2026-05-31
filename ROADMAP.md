@@ -105,19 +105,19 @@ Example: 11.09 mi ÷ 32.4 MPG × $3.29/gal = $1.13
 
 ## 📋 Backlog
 
-| Feature | Notes |
-|---|---|
-| GCS file-based coordinate storage | Replace Firestore inline coordinates to remove 1MB limit entirely for very long drives |
-| "Copy for AI" drive export | Copy a compact JSON summary + sampled route to clipboard for pasting into any AI chat |
-| Drive Score / Road DNA | Score each drive on curve density, elevation delta, and speed variance — car enthusiasts chase high scores |
-| Track Day Mode | Lap timer, auto-detected start/finish line, sector colouring on map |
-| Speed-adaptive RDP epsilon | Apply tighter RDP on city sections, looser on highways for optimal point reduction |
-| Drive Comparison | Overlay two drives on the same map and speed graph — "was I faster Tuesday or Sunday?" |
-| Achievement System | Unlockable milestones: First 1,000 miles, Elevation Seeker, Night Owl, etc. |
-| Drive replay / animation | Replay the drive on the map with the car marker moving along the recorded route |
-| Strava / Garmin Connect export | Push completed drives to third-party fitness/activity platforms |
-| OBD-II Bluetooth integration | Pair with ELM327 dongle for real engine telemetry (RPM, boost, coolant temp) |
-| Group Drive / Convoy Mode | Multiple DriveTracker users share a real-time map during a group drive |
+| ID | Feature | Notes |
+|---|---|---|
+| DT-001 | GCS file-based coordinate storage | Replace Firestore inline coordinates to remove 1MB limit entirely for very long drives |
+| DT-002 | "Copy for AI" drive export | Copy a compact JSON summary + sampled route to clipboard for pasting into any AI chat |
+| DT-003 | Drive Score / Road DNA | Score each drive on curve density, elevation delta, and speed variance — car enthusiasts chase high scores |
+| DT-004 | Track Day Mode | Lap timer, auto-detected start/finish line, sector colouring on map |
+| DT-005 | Speed-adaptive RDP epsilon | Apply tighter RDP on city sections, looser on highways for optimal point reduction |
+| DT-006 | Drive Comparison | Overlay two drives on the same map and speed graph — "was I faster Tuesday or Sunday?" |
+| DT-007 | Achievement System | Unlockable milestones: First 1,000 miles, Elevation Seeker, Night Owl, etc. |
+| DT-008 | Drive replay / animation | Replay the drive on the map with the car marker moving along the recorded route |
+| DT-009 | Strava / Garmin Connect export | Push completed drives to third-party fitness/activity platforms |
+| DT-010 | OBD-II Bluetooth integration | Pair with ELM327 dongle for real engine telemetry (RPM, boost, coolant temp) |
+| DT-011 | Group Drive / Convoy Mode | Multiple DriveTracker users share a real-time map during a group drive |
 
 ---
 
