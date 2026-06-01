@@ -1057,6 +1057,14 @@ function setStatus(msg) {
   document.getElementById('status-bar').textContent = msg;
 }
 
+function showToast(msg, durationMs = 2500) {
+  const el = document.getElementById('copy-toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('visible'), durationMs);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 7. History & export
 // ═══════════════════════════════════════════════════════════════
@@ -1104,6 +1112,48 @@ function buildKML(drive) {
     </Placemark>
   </Document>
 </kml>`;
+}
+
+function buildAIExport(drive) {
+  const AI_SAMPLE_TARGET = 100;
+  const allCoords = drive.coordinates || [];
+  const stride = allCoords.length > AI_SAMPLE_TARGET
+    ? Math.floor(allCoords.length / AI_SAMPLE_TARGET)
+    : 1;
+
+  const sampled = [];
+  for (let i = 0; i < allCoords.length; i += stride) {
+    const c = allCoords[i];
+    sampled.push([
+      parseFloat(c.lat.toFixed(5)),
+      parseFloat(c.lng.toFixed(5)),
+      c.alt   != null ? parseFloat(c.alt.toFixed(1))                       : null,
+      c.speed != null && c.speed >= 0 ? parseFloat(mpsToMph(c.speed).toFixed(1)) : null,
+    ]);
+  }
+  // Always include the final point if not already captured.
+  if (allCoords.length > 0) {
+    const last = allCoords[allCoords.length - 1];
+    const lastIncludedIdx = Math.floor((allCoords.length - 1) / stride) * stride;
+    if (lastIncludedIdx !== allCoords.length - 1) {
+      sampled.push([
+        parseFloat(last.lat.toFixed(5)),
+        parseFloat(last.lng.toFixed(5)),
+        last.alt   != null ? parseFloat(last.alt.toFixed(1))                       : null,
+        last.speed != null && last.speed >= 0 ? parseFloat(mpsToMph(last.speed).toFixed(1)) : null,
+      ]);
+    }
+  }
+
+  return JSON.stringify({
+    vehicle:         drive.vehicle || 'Unknown',
+    date:            new Date(drive.startedAt).toISOString().slice(0, 10),
+    startedAt:       new Date(drive.startedAt).toISOString(),
+    durationSeconds: drive.durationSeconds,
+    distanceMiles:   parseFloat((drive.distanceMiles || 0).toFixed(3)),
+    totalPoints:     allCoords.length,
+    coords:          sampled,
+  });
 }
 
 /**
@@ -1283,6 +1333,7 @@ async function renderHistory() {
             <button class="export-btn map-view-btn" data-id="${drive.id}" data-format="map">🗺 Map</button>
             <button class="export-btn" data-id="${drive.id}" data-format="gpx">↓ GPX</button>
             <button class="export-btn" data-id="${drive.id}" data-format="kml">↓ KML</button>
+            <button class="export-btn" data-id="${drive.id}" data-format="ai">⊕ AI</button>
             <button class="export-btn delete-btn" data-id="${drive.id}" data-format="delete" style="margin-left:auto">🗑 Delete</button>
           </div>
         </div>
@@ -1303,11 +1354,19 @@ async function renderHistory() {
           return;
         }
         if (format === 'map') { openDriveMap(drive); return; }
-        // For GPX/KML combine all parts into one export file.
+        // For GPX/KML/AI combine all parts into one export.
         const parts     = await getDriveGroup(drive);
         const combined  = { ...drive, coordinates: parts.flatMap(p => p.coordinates || []) };
         if (format === 'gpx') downloadFile(buildGPX(combined), `${baseName}.gpx`, 'application/gpx+xml');
         if (format === 'kml') downloadFile(buildKML(combined), `${baseName}.kml`, 'application/vnd.google-earth.kml+xml');
+        if (format === 'ai') {
+          try {
+            await navigator.clipboard.writeText(buildAIExport(combined));
+            showToast('Copied for AI ✓');
+          } catch {
+            showToast('Copy failed — try again', 3000);
+          }
+        }
       });
     });
     historyList.appendChild(item);
