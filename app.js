@@ -16,7 +16,7 @@
 'use strict';
 
 // Current app version — update this with every release.
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
@@ -936,13 +936,40 @@ async function startDrive() {
     els.duration.textContent = formatDuration(getElapsedSeconds());
   }, 1000);
 
-  setCTAState('stop');
+  setCTAState('recording');
   setStatus('Drive started. Acquiring GPS signal…');
   document.getElementById('vehicle-select').disabled = true;
 }
 
+async function pauseDrive() {
+  if (!sessionState.active || sessionState.paused) return;
+  sessionState.paused   = true;
+  sessionState.pausedAt = Date.now();
+  await releaseWakeLock();
+  setCTAState('paused');
+  setStatus('Drive paused. Tap Resume to continue.');
+}
+
+async function resumeDrive() {
+  if (!sessionState.active || !sessionState.paused) return;
+  if (sessionState.pausedAt) {
+    sessionState.totalPausedMs += Date.now() - sessionState.pausedAt;
+    sessionState.pausedAt = null;
+  }
+  sessionState.paused = false;
+  await acquireWakeLock();
+  setCTAState('recording');
+  setStatus('Drive resumed.');
+}
+
 async function stopDrive() {
   if (!sessionState.active) return;
+
+  // If stopped while paused, account for the current paused segment.
+  if (sessionState.paused && sessionState.pausedAt) {
+    sessionState.totalPausedMs += Date.now() - sessionState.pausedAt;
+    sessionState.pausedAt = null;
+  }
 
   if (sessionState.watchId !== null) {
     navigator.geolocation.clearWatch(sessionState.watchId);
@@ -1036,22 +1063,36 @@ async function stopDrive() {
   startIdleWatch();     // resume blue dot — will reappear on next GPS tick
 }
 
-// ── CTA button ──────────────────────────────────────────────────────────────
-const ctaBtn = document.getElementById('cta-btn');
+// ── CTA / drive controls ─────────────────────────────────────────────────────
+const ctaBtn       = document.getElementById('cta-btn');
+const driveControls = document.getElementById('drive-controls');
+const pauseBtn     = document.getElementById('pause-btn');
+const stopBtn      = document.getElementById('stop-btn');
 
 function setCTAState(state) {
   if (state === 'start') {
-    ctaBtn.textContent = '▶  Start Drive';
-    ctaBtn.className   = 'start';
-  } else {
-    ctaBtn.textContent = '⏹  Stop Drive';
-    ctaBtn.className   = 'stop';
+    ctaBtn.textContent    = '▶  Start Drive';
+    ctaBtn.className      = 'start';
+    ctaBtn.style.display  = '';
+    driveControls.style.display = 'none';
+  } else if (state === 'recording') {
+    ctaBtn.style.display  = 'none';
+    driveControls.style.display = 'flex';
+    pauseBtn.textContent  = '⏸  Pause';
+    pauseBtn.className    = '';
+  } else if (state === 'paused') {
+    ctaBtn.style.display  = 'none';
+    driveControls.style.display = 'flex';
+    pauseBtn.textContent  = '▶  Resume';
+    pauseBtn.className    = 'paused';
   }
 }
 
-ctaBtn.addEventListener('click', () => {
-  sessionState.active ? stopDrive() : startDrive();
+ctaBtn.addEventListener('click', () => { startDrive(); });
+pauseBtn.addEventListener('click', () => {
+  sessionState.paused ? resumeDrive() : pauseDrive();
 });
+stopBtn.addEventListener('click', () => { stopDrive(); });
 
 function setStatus(msg) {
   document.getElementById('status-bar').textContent = msg;

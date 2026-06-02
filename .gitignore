@@ -18,3 +18,8 @@ config.js        # generated from .env locally or Secret Manager in CI
 *.env
 .env
 .env.*
+
+# Firebase Hosting artefacts (hosting not used — GCS handles static files)
+.firebase/
+firebase.json
+.firebaserc

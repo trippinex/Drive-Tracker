@@ -476,6 +476,64 @@ body {
   50%       { opacity: 0; }
 }
 
+/* Split Pause / Stop controls — visible only during an active drive */
+#cta-area {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 16px 16px;
+}
+
+#cta-area #cta-btn {
+  width: 100%;
+  margin: 0;
+}
+
+#drive-controls {
+  display: flex;
+  gap: 10px;
+}
+
+#drive-controls.hidden { display: none; }
+
+#pause-btn,
+#stop-btn {
+  flex: 1;
+  padding: 16px;
+  min-height: 56px;
+  border-radius: 14px;
+  border: none;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: #fff;
+  transition: background .2s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+#pause-btn {
+  background: #d97706;
+  box-shadow: 0 4px 16px rgba(217,119,6,.35);
+}
+#pause-btn:hover  { background: #b45309; }
+#pause-btn:active { transform: scale(.98); }
+
+#pause-btn.paused {
+  background: #2563eb;
+  box-shadow: 0 4px 16px rgba(37,99,235,.35);
+}
+#pause-btn.paused:hover { background: #1d4ed8; }
+
+#stop-btn {
+  background: var(--stop-bg);
+  box-shadow: 0 4px 16px rgba(239,68,68,.35);
+}
+#stop-btn:hover  { background: #dc2626; }
+#stop-btn:active { transform: scale(.98); }
+
 /* ── 11. Status bar ──────────────────────────────────────── */
 #status-bar {
   background: var(--surface-2);

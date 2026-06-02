@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-06-01
+
+### Added
+
+#### "Copy for AI" Drive Export (DT-002)
+- New **⊕ AI** button on each Drive History card
+- Copies a compact JSON payload to the clipboard — drive metadata plus ~100 evenly-sampled GPS coordinates — ready to paste into any AI chat for analysis
+
+#### Pause and Resume Drive Recording (DT-013)
+- During an active drive, the **Stop Drive** button is replaced by a **Pause | Stop** split control
+- **Pause** (amber) halts GPS recording and releases the screen wake lock; the timer freezes
+- **Resume** (blue) reacquires the wake lock and continues recording seamlessly
+- Paused time is excluded from the final drive duration
+
+---
+
 ## [1.2.1] - 2026-05-31
 
 ### Fixed

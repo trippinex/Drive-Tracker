@@ -13,10 +13,11 @@ Update this file when a feature moves from one stage to the next.
 | v1.1.0 | GPS recording improvements — speed-adaptive threshold, 2s time gate, RDP simplification |
 | v1.2.0 | About modal, Settings → Garage rename, garage icon |
 | v1.2.1 | Long-drive stability — iterative RDP, GPS gap detection, wake lock heartbeat, arrow cap, rolling flush, secret management |
+| v1.3.0 | "Copy for AI" drive export (DT-002), Pause and resume drive recording (DT-013) |
 
 ---
 
-## 🚀 Next Up — v1.3.0
+## 🚀 Next Up — v1.4.0
 
 > TBD — no features assigned yet.
 
@@ -28,7 +29,6 @@ Update this file when a feature moves from one stage to the next.
 | ID | Feature | Notes |
 |---|---|---|
 | DT-001 | GCS file-based coordinate storage | Replace Firestore inline coordinates to remove 1MB limit entirely for very long drives |
-| DT-002 | "Copy for AI" drive export | Copy a compact JSON summary + sampled route to clipboard for pasting into any AI chat |
 | DT-003 | Drive Score / Road DNA | Score each drive on curve density, elevation delta, and speed variance — car enthusiasts chase high scores |
 | DT-004 | Track Day Mode | Lap timer, auto-detected start/finish line, sector colouring on map |
 | DT-005 | Speed-adaptive RDP epsilon | Apply tighter RDP on city sections, looser on highways for optimal point reduction |
@@ -39,7 +39,6 @@ Update this file when a feature moves from one stage to the next.
 | DT-010 | OBD-II Bluetooth integration | Pair with ELM327 dongle for real engine telemetry (RPM, boost, coolant temp) |
 | DT-011 | Group Drive / Convoy Mode | Multiple DriveTracker users share a real-time map during a group drive |
 | DT-012 | Drive History pagination & search | History panel currently loads all drives at once — add pagination, virtual scrolling, and date/vehicle filtering to keep the UI performant as the drive count grows into the hundreds |
-| DT-013 | Pause and resume drive recording | Allow the driver to pause an active recording session (e.g. fuel stop, rest area) and resume without starting a new drive. GPS tracking and the timer halt on pause; the route polyline and all telemetry resume seamlessly on resume. Paused time is excluded from drive duration. The Stop Drive button becomes a Pause / Stop split control during an active session. |
 | DT-014 | Claude AI Drive Analysis | Analyze button on Drive History entries; sends drive data to Claude via GCP Cloud Function proxy (Firebase JWT auth, Secret Manager for API key); displays car-enthusiast-style analysis dialog. Medium scope. |
 | DT-015 | Shared Garage (FuelTracker integration) | Single Firestore-backed vehicle garage at `users/{uid}/vehicles/{id}` shared between DriveTracker and FuelTracker via onSnapshot. Requires vehicle schema alignment and SQLite→Firestore migration for FuelTracker. Medium-High scope. |
 | DT-016 | Cost Per Drive (FuelTracker integration) | Display estimated fuel cost on Drive History cards using FuelTracker's rolling MPG and last fuel price (`distance ÷ MPG × $/gal`). Depends on DT-015. Low-Medium scope. |

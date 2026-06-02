@@ -31,7 +31,7 @@
                  .btn-primary .btn-secondary .btn-danger
                  .nav-link .card .form-input .form-label .form-select
                  .alert-success .alert-error -->
-  <link rel="stylesheet" href="/ui-theme/theme.css?v=23" />
+  <link rel="stylesheet" href="/ui-theme/theme.css?v=26" />
 
   <!-- Tailwind CSS (CDN) extended with the theme's brand palette -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -59,7 +59,7 @@
   </script>
 
   <!-- DriveTracker custom styles -->
-  <link rel="stylesheet" href="/styles.css?v=23" />
+  <link rel="stylesheet" href="/styles.css?v=26" />
 </head>
 
 <!-- overflow handled in styles.css via dvh; removed from class to not clip iOS safe-area -->
@@ -221,11 +221,17 @@
   <div id="status-bar" role="status" aria-live="polite">Initializing…</div>
 
   <!-- ══════════════════════════════════════════════════
-       CTA BUTTON
+       CTA BUTTON AREA
        ══════════════════════════════════════════════════ -->
-  <button id="cta-btn" class="start" aria-label="Start drive">
-    ▶  Start Drive
-  </button>
+  <div id="cta-area">
+    <button id="cta-btn" class="start" aria-label="Start drive">
+      ▶  Start Drive
+    </button>
+    <div id="drive-controls" style="display:none">
+      <button id="pause-btn" aria-label="Pause drive">⏸  Pause</button>
+      <button id="stop-btn"  aria-label="Stop drive">⏹  Stop</button>
+    </div>
+  </div>
 
   <!-- ══════════════════════════════════════════════════
        HISTORY BOTTOM SHEET
@@ -507,7 +513,7 @@
        SCRIPTS
        ══════════════════════════════════════════════════ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/app.js?v=23"></script>
+  <script src="/app.js?v=26"></script>
 
   <!-- Firebase SDKs (compat build — no bundler needed) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
