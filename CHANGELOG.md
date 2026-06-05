@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2026-06-04
+
+### Added
+
+#### Drive Score / Road DNA (DT-003)
+- Every drive is automatically scored on three dimensions using fixed real-world benchmarks:
+  - **Curve Density** — total bearing-change degrees per mile (jitter < 5° filtered); benchmarked from flat highway to Tail of the Dragon
+  - **Elevation Delta** — cumulative elevation gain (ft/mile); suppressed and excluded from composite when > 50% of GPS points lack altitude data
+  - **Speed Variance** — standard deviation of GPS speeds (mph); rewards spirited, dynamic driving over monotone cruising
+- **Composite grade** — weighted average (Curve 40%, Elevation 35%, Speed 25%) mapped to letter grade **S / A / B / C / D**
+- **Colored grade badge** replaces the Points stat in Drive History cards — gold (S), green (A), blue (B), yellow (C), red (D)
+- **Post-drive summary modal** — shown immediately after stopping a drive; displays the composite grade badge plus all three sub-scores before returning to the main screen
+- **Drive DNA panel** — fixed pill at the bottom of the full-screen map tab showing Curve / Elevation / Speed / Overall sub-grades
+- Pre-v1.4.0 drives are **backfilled lazily** on first history open — score computed from stored coordinates and written back to IndexedDB + Firestore silently
+
+---
+
 ## [1.3.0] - 2026-06-01
 
 ### Added
@@ -160,8 +177,3 @@ Validated against three recorded drives showing 94.8% reduction in stored GPS po
 
 ---
 
-## Unreleased
-
-### Planned
-- GCS file-based coordinate storage (replacing Firestore inline coordinates)
-- "Copy for AI" drive export button
