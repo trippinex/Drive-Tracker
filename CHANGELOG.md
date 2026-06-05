@@ -12,14 +12,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### Drive Score / Road DNA (DT-003)
-- Every drive is automatically scored on three dimensions using fixed real-world benchmarks:
-  - **Curve Density** — total bearing-change degrees per mile (jitter < 5° filtered); benchmarked from flat highway to Tail of the Dragon
-  - **Elevation Delta** — cumulative elevation gain (ft/mile); suppressed and excluded from composite when > 50% of GPS points lack altitude data
-  - **Speed Variance** — standard deviation of GPS speeds (mph); rewards spirited, dynamic driving over monotone cruising
-- **Composite grade** — weighted average (Curve 40%, Elevation 35%, Speed 25%) mapped to letter grade **S / A / B / C / D**
+Every drive is automatically scored on three dimensions and assigned a letter grade **S / A / B / C / D** using fixed real-world benchmarks — scores never shift as your library grows.
+
+**Curve Density** — measures how twisty the road was (total bearing-change degrees per mile, GPS jitter < 5° filtered out):
+
+| Grade | °/mile | What it feels like |
+|---|---|---|
+| S | > 3,200 | Tail of the Dragon, mountain hairpins |
+| A | 2,000 – 3,200 | Canyon roads, serious mountain passes |
+| B | 1,200 – 2,000 | Fun back roads, rolling hills |
+| C | 500 – 1,200 | Suburban streets, gentle curves |
+| D | < 500 | Highways, straight country roads |
+
+**Elevation Delta** — measures how hilly the route was (cumulative elevation gain in ft/mile). Suppressed (`--`) when more than half of GPS points lack altitude data:
+
+| Grade | ft/mile | What it feels like |
+|---|---|---|
+| S | > 400 | Serious mountain driving |
+| A | 150 – 400 | Mountain roads |
+| B | 50 – 150 | Rolling hills |
+| C | 10 – 50 | Gently rolling terrain |
+| D | < 10 | Flat as a pancake |
+
+**Speed Variance** — measures how dynamic the driving was (standard deviation of GPS speeds in mph). Rewards acceleration and braking over a monotone cruise:
+
+| Grade | Std dev (mph) | What it feels like |
+|---|---|---|
+| S | > 30 | Very dynamic — hard acceleration, trail braking |
+| A | 20 – 30 | Spirited driving |
+| B | 12 – 20 | Active, engaged driving |
+| C | 5 – 12 | Normal varied driving |
+| D | < 5 | Cruise control on the interstate |
+
+**Composite grade** — weighted average of all three dimensions (Curve 40%, Elevation 35%, Speed 25%). Weight redistributes proportionally if Elevation or Speed data is unavailable.
+
 - **Colored grade badge** replaces the Points stat in Drive History cards — gold (S), green (A), blue (B), yellow (C), red (D)
-- **Post-drive summary modal** — shown immediately after stopping a drive; displays the composite grade badge plus all three sub-scores before returning to the main screen
+- **Post-drive summary modal** — shown immediately after stopping a drive; displays the composite grade plus all three sub-scores
 - **Drive DNA panel** — fixed pill at the bottom of the full-screen map tab showing Curve / Elevation / Speed / Overall sub-grades
+- Drives shorter than 1 mile are not scored (`--`)
 - Pre-v1.4.0 drives are **backfilled lazily** on first history open — score computed from stored coordinates and written back to IndexedDB + Firestore silently
 
 ---
