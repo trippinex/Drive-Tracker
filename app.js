@@ -16,7 +16,7 @@
 'use strict';
 
 // Current app version — update this with every release.
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
@@ -1003,8 +1003,9 @@ async function stopDrive() {
     const driveGroupId = sessionState.driveGroupId;
 
     // Save final (remaining) chunk if it has enough points.
+    let lastPartId = null;
     if (coords.length > 1) {
-      await saveDrive({
+      lastPartId = await saveDrive({
         vehicle:         sessionState.vehicle,
         startedAt:       sessionState.startTime,
         endedAt, durationSeconds: duration, distanceMiles: distance,
@@ -1025,6 +1026,17 @@ async function stopDrive() {
 
     setStatus(`Drive saved (${totalParts} parts, ${distance.toFixed(2)} mi).`);
 
+    // Compute score from all parts — need DB read since flushed coords are no longer in memory.
+    const allDrives   = await getAllDrives();
+    const groupCoords = allDrives
+      .filter(d => d.driveGroupId === driveGroupId)
+      .sort((a, b) => a.partNumber - b.partNumber)
+      .flatMap(d => d.coordinates || []);
+    const score = computeDriveScore(groupCoords, distance);
+    const allPartIds = [...sessionState.flushedPartIds, ...(lastPartId != null ? [lastPartId] : [])];
+    for (const pid of allPartIds) await updateDriveById(pid, { score });
+    showDriveSummary(score);
+
   } else if (sessionState.coordinates.length > 1) {
     // Normal path — no rolling flush occurred.
     const raw    = sessionState.coordinates;
@@ -1039,6 +1051,7 @@ async function stopDrive() {
 
     const isMultiPart  = chunks.length > 1;
     const driveGroupId = isMultiPart ? String(sessionState.startTime) : undefined;
+    const score        = computeDriveScore(coords, distance);
 
     for (let i = 0; i < chunks.length; i++) {
       await saveDrive({
@@ -1046,12 +1059,14 @@ async function stopDrive() {
         startedAt:       sessionState.startTime,
         endedAt, durationSeconds: duration, distanceMiles: distance,
         coordinates:     chunks[i],
+        score,
         ...(isMultiPart && { driveGroupId, partNumber: i + 1, totalParts: chunks.length }),
       });
     }
 
     const partNote = isMultiPart ? ` (${chunks.length} parts)` : '';
     setStatus(`Drive saved (${coords.length} pts, ${distance.toFixed(2)} mi${partNote}).`);
+    showDriveSummary(score);
 
   } else {
     setStatus('Drive cancelled — too few GPS points recorded.');
@@ -1105,6 +1120,142 @@ function showToast(msg, durationMs = 2500) {
   clearTimeout(el._timer);
   el._timer = setTimeout(() => el.classList.remove('visible'), durationMs);
 }
+
+// ── Drive scoring ──────────────────────────────────────────────────────────────
+
+const GRADE_COLORS = {
+  'S':  { bg: 'rgba(245,158,11,0.15)',  border: '#f59e0b', color: '#f59e0b' },
+  'A':  { bg: 'rgba(34,197,94,0.15)',   border: '#22c55e', color: '#22c55e' },
+  'B':  { bg: 'rgba(59,130,246,0.15)',  border: '#3b82f6', color: '#3b82f6' },
+  'C':  { bg: 'rgba(234,179,8,0.15)',   border: '#eab308', color: '#eab308' },
+  'D':  { bg: 'rgba(239,68,68,0.15)',   border: '#ef4444', color: '#ef4444' },
+  '--': { bg: 'rgba(100,116,139,0.15)', border: '#64748b', color: '#64748b' },
+};
+
+/**
+ * Score a drive on three dimensions using fixed real-world benchmarks.
+ * Returns { composite, grade, curve, elevation, speed } where each grade is
+ * 'S'|'A'|'B'|'C'|'D'|'--'.  '--' signals insufficient data for that dimension.
+ */
+function computeDriveScore(coords, distanceMiles) {
+  if (!coords || coords.length < 2 || (distanceMiles || 0) < 1) {
+    return { composite: null, grade: '--',
+             curve:     { raw: null, grade: '--' },
+             elevation: { raw: null, grade: '--' },
+             speed:     { raw: null, grade: '--' } };
+  }
+
+  // Curve density — total bearing-change degrees per mile, ignoring jitter < 5°
+  let totalDeg = 0;
+  for (let i = 2; i < coords.length; i++) {
+    const b1 = getBearing(coords[i-2].lat, coords[i-2].lng, coords[i-1].lat, coords[i-1].lng);
+    const b2 = getBearing(coords[i-1].lat, coords[i-1].lng, coords[i].lat,   coords[i].lng);
+    let d = Math.abs(b2 - b1);
+    if (d > 180) d = 360 - d;
+    if (d >= 5) totalDeg += d;
+  }
+  const curveRaw = Math.min(totalDeg / distanceMiles / 3200, 1) * 100;
+
+  // Elevation gain — cumulative positive altitude delta (m→ft) per mile
+  const altPts = coords.filter(c => c.alt != null);
+  let elevationRaw = null;
+  if (altPts.length / coords.length >= 0.5) {
+    let gainM = 0;
+    for (let i = 1; i < altPts.length; i++) {
+      const d = altPts[i].alt - altPts[i-1].alt;
+      if (d > 0) gainM += d;
+    }
+    elevationRaw = Math.min((gainM * 3.28084) / distanceMiles / 400, 1) * 100;
+  }
+
+  // Speed variance — standard deviation of GPS speeds (mph)
+  const spds = coords.filter(c => c.speed != null && c.speed >= 0).map(c => mpsToMph(c.speed));
+  let speedRaw = null;
+  if (spds.length >= 2) {
+    const mean   = spds.reduce((a, b) => a + b, 0) / spds.length;
+    const stdDev = Math.sqrt(spds.reduce((s, v) => s + (v - mean) ** 2, 0) / spds.length);
+    speedRaw = Math.min(stdDev / 30, 1) * 100;
+  }
+
+  // Composite — weighted average, redistributing weight if a dimension is absent
+  const dims = [
+    { raw: curveRaw, w: 0.40 },
+    ...(elevationRaw !== null ? [{ raw: elevationRaw, w: 0.35 }] : []),
+    ...(speedRaw     !== null ? [{ raw: speedRaw,     w: 0.25 }] : []),
+  ];
+  const totalW    = dims.reduce((s, d) => s + d.w, 0);
+  const composite = dims.reduce((s, d) => s + d.raw * (d.w / totalW), 0);
+
+  const toGrade = v => {
+    if (v === null) return '--';
+    if (v >= 85) return 'S';
+    if (v >= 70) return 'A';
+    if (v >= 55) return 'B';
+    if (v >= 40) return 'C';
+    return 'D';
+  };
+
+  return {
+    composite: Math.round(composite),
+    grade:     toGrade(composite),
+    curve:     { raw: Math.round(curveRaw),                                    grade: toGrade(curveRaw) },
+    elevation: { raw: elevationRaw !== null ? Math.round(elevationRaw) : null, grade: toGrade(elevationRaw) },
+    speed:     { raw: speedRaw     !== null ? Math.round(speedRaw)     : null, grade: toGrade(speedRaw) },
+  };
+}
+
+/** Render a colored letter-grade badge as an HTML string.
+ *  Pass large=true for the post-drive summary hero badge. */
+function gradeBadgeHTML(grade, large = false) {
+  const c   = GRADE_COLORS[grade] || GRADE_COLORS['--'];
+  const fs  = large ? '32px' : '14px';
+  const pad = large ? '10px 22px' : '2px 8px';
+  return `<span style="display:inline-block;background:${c.bg};border:2px solid ${c.border};color:${c.color};font-size:${fs};padding:${pad};font-weight:800;border-radius:10px;line-height:1.2;letter-spacing:0.02em">${grade}</span>`;
+}
+
+/** Build the Drive DNA panel HTML for the standalone map page.
+ *  Uses inline styles since the map page has no access to styles.css. */
+function buildDnaHTML(score) {
+  const badge = (grade) => {
+    const map = {
+      'S': ['rgba(245,158,11,0.2)', '#f59e0b'],
+      'A': ['rgba(34,197,94,0.2)',  '#22c55e'],
+      'B': ['rgba(59,130,246,0.2)', '#3b82f6'],
+      'C': ['rgba(234,179,8,0.2)',  '#eab308'],
+      'D': ['rgba(239,68,68,0.2)',  '#ef4444'],
+    };
+    const [bg, col] = map[grade] || ['rgba(100,116,139,0.2)', '#64748b'];
+    return `<span style="display:inline-block;background:${bg};border:1.5px solid ${col};color:${col};font-size:13px;padding:2px 8px;font-weight:800;border-radius:7px;line-height:1.3">${grade}</span>`;
+  };
+  const item = (label, grade) =>
+    `<div class="dna-item"><div class="dna-grade">${label}</div>${badge(grade)}</div>`;
+  return `
+    ${item('Curve',     score.curve.grade)}
+    <div class="dna-sep"></div>
+    ${item('Elevation', score.elevation.grade)}
+    <div class="dna-sep"></div>
+    ${item('Speed',     score.speed.grade)}
+    <div class="dna-sep"></div>
+    ${item('Overall',   score.grade)}
+  `;
+}
+
+function showDriveSummary(score) {
+  const overlay = document.getElementById('drive-summary-overlay');
+  if (!overlay) return;
+  document.getElementById('drive-summary-badge').innerHTML = gradeBadgeHTML(score.grade, true);
+  const row = (label, g) =>
+    `<div class="drive-summary-row"><span class="drive-summary-sub-label">${label}</span>${gradeBadgeHTML(g)}</div>`;
+  document.getElementById('drive-summary-subs').innerHTML =
+    row('Curve',          score.curve.grade) +
+    row('Elevation',      score.elevation.grade) +
+    row('Speed Variance', score.speed.grade);
+  overlay.removeAttribute('hidden');
+}
+
+document.getElementById('drive-summary-close')?.addEventListener('click', () => {
+  document.getElementById('drive-summary-overlay')?.setAttribute('hidden', '');
+});
 
 // ═══════════════════════════════════════════════════════════════
 // 7. History & export
@@ -1214,6 +1365,7 @@ async function openDriveMap(drive) {
   // Combine all parts for multi-part drives so the full route is shown.
   const parts     = await getDriveGroup(drive);
   const allCoords = parts.flatMap(p => p.coordinates || []);
+  const score     = drive.score || computeDriveScore(allCoords, drive.distanceMiles || 0);
   const coords    = allCoords.map(c => [c.lat, c.lng]);
   const title   = `${drive.vehicle || 'Drive'} — ${new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
   const stats   = `${(drive.distanceMiles || 0).toFixed(2)} mi &nbsp;·&nbsp; ${formatDuration(drive.durationSeconds || 0)}`;
@@ -1252,6 +1404,17 @@ async function openDriveMap(drive) {
     #info strong { color: #f97316; font-size: 14px; }
     #info span   { font-size: 13px; color: #94a3b8; }
     .route-arrow { display: flex; align-items: center; justify-content: center; }
+    #dna {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: rgba(15,23,42,0.92); color: #f1f5f9;
+      padding: 10px 18px; border-radius: 12px; z-index: 1000;
+      display: flex; align-items: center; gap: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3); backdrop-filter: blur(8px);
+      white-space: nowrap; font-family: system-ui, sans-serif;
+    }
+    .dna-grade { font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 2px; }
+    .dna-item  { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .dna-sep   { width: 1px; height: 28px; background: rgba(148,163,184,.25); }
   </style>
 </head>
 <body>
@@ -1261,6 +1424,7 @@ async function openDriveMap(drive) {
     <span>${stats}</span>
   </div>
   <div id="map"></div>
+  <div id="dna">${buildDnaHTML(score)}</div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const coords    = ${JSON.stringify(coords)};
@@ -1346,6 +1510,11 @@ async function renderHistory() {
 
   historyList.innerHTML = '';
   drives.forEach(drive => {
+    // Lazy backfill: compute + persist score for drives that pre-date v1.4.0.
+    if (!drive.score && (drive.distanceMiles || 0) >= 1 && drive.coordinates?.length >= 2) {
+      drive.score = computeDriveScore(drive.coordinates, drive.distanceMiles);
+      updateDriveById(drive.id, { score: drive.score });
+    }
     const date      = new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     const time      = new Date(drive.startedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const partLabel = drive.totalParts ? ` — Part ${drive.partNumber} of ${drive.totalParts}` : '';
@@ -1368,7 +1537,7 @@ async function renderHistory() {
           <div class="history-item-stats">
             <div class="history-stat"><span class="history-stat-label">Distance</span><span class="history-stat-value">${drive.distanceMiles.toFixed(2)} mi</span></div>
             <div class="history-stat"><span class="history-stat-label">Duration</span><span class="history-stat-value">${formatDuration(drive.durationSeconds)}</span></div>
-            <div class="history-stat"><span class="history-stat-label">Points</span><span class="history-stat-value">${drive.coordinates.length}</span></div>
+            <div class="history-stat"><span class="history-stat-label">Score</span><span class="history-stat-value">${drive.score ? gradeBadgeHTML(drive.score.grade) : '<span style="color:var(--text-muted)">—</span>'}</span></div>
           </div>
           <div class="history-item-actions">
             <button class="export-btn map-view-btn" data-id="${drive.id}" data-format="map">🗺 Map</button>

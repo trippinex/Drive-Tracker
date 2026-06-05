@@ -938,6 +938,62 @@ body {
 }
 .about-changelog-btn:hover { background: var(--brand-dark); }
 
+/* ── 15b. Drive score — summary modal ───────────────────── */
+.drive-summary-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.drive-summary-overlay[hidden] { display: none; }
+
+.drive-summary-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border-mid);
+  border-radius: 20px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.18);
+  padding: 32px 28px 24px;
+  width: 100%;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.drive-summary-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .10em;
+  color: var(--text-muted);
+}
+
+.drive-summary-subs {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.drive-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drive-summary-sub-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.drive-summary-close-btn { width: 100%; }
+
 /* ── 16. Login overlay ───────────────────────────────────── */
 /*
    Full-screen overlay shown before sign-in.
