@@ -1231,11 +1231,8 @@ function buildDnaHTML(score) {
     `<div class="dna-item"><div class="dna-grade">${label}</div>${badge(grade)}</div>`;
   return `
     ${item('Curve',     score.curve.grade)}
-    <div class="dna-sep"></div>
     ${item('Elevation', score.elevation.grade)}
-    <div class="dna-sep"></div>
     ${item('Speed',     score.speed.grade)}
-    <div class="dna-sep"></div>
     ${item('Overall',   score.grade)}
   `;
 }
@@ -1407,14 +1404,15 @@ async function openDriveMap(drive) {
     #dna {
       position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
       background: rgba(15,23,42,0.92); color: #f1f5f9;
-      padding: 10px 18px; border-radius: 12px; z-index: 1000;
-      display: flex; align-items: center; gap: 16px;
+      padding: 10px 16px; border-radius: 12px; z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      flex-wrap: wrap; gap: 10px 14px;
+      max-width: calc(100vw - 32px);
       box-shadow: 0 4px 20px rgba(0,0,0,0.3); backdrop-filter: blur(8px);
-      white-space: nowrap; font-family: system-ui, sans-serif;
+      font-family: system-ui, sans-serif;
     }
-    .dna-grade { font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 2px; }
+    .dna-grade { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 2px; }
     .dna-item  { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-    .dna-sep   { width: 1px; height: 28px; background: rgba(148,163,184,.25); }
   </style>
 </head>
 <body>
