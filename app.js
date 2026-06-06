@@ -16,7 +16,7 @@
 'use strict';
 
 // Current app version — update this with every release.
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
@@ -1064,6 +1064,7 @@ async function stopDrive() {
       });
     }
 
+    historyDirty = true;
     const partNote = isMultiPart ? ` (${chunks.length} parts)` : '';
     setStatus(`Drive saved (${coords.length} pts, ${distance.toFixed(2)} mi${partNote}).`);
     showDriveSummary(score);
@@ -1259,7 +1260,22 @@ document.getElementById('drive-summary-close')?.addEventListener('click', () => 
 // ═══════════════════════════════════════════════════════════════
 
 const historyOverlay = document.getElementById('history-overlay');
+const historyPanel   = document.getElementById('history-panel');
 const historyList    = document.getElementById('history-list');
+
+// Elements that receive `inert` while the history panel is open.
+const HISTORY_INERT_TARGETS = [
+  document.getElementById('app-header'),
+  document.querySelector('main'),
+];
+
+function escapeHTML(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+const HISTORY_PAGE_SIZE = 20;
+let historyDirty    = true;
+let historyObserver = null;
 
 function buildGPX(drive) {
   const trkpts = drive.coordinates.map(c => {
@@ -1495,7 +1511,7 @@ async function renderHistory() {
   try {
     [drives, vehicles] = await Promise.all([getAllDrives(), getAllVehicles()]);
   } catch (err) {
-    historyList.innerHTML = `<p class="empty-history">Could not load history: ${err.message}</p>`;
+    historyList.innerHTML = `<p class="empty-history">Could not load history: ${escapeHTML(err.message)}</p>`;
     return;
   }
   if (!drives.length) {
@@ -1503,91 +1519,182 @@ async function renderHistory() {
     return;
   }
 
+  // Batch the lazy score backfill before touching the DOM.
+  const backfillUpdates = [];
+  for (const drive of drives) {
+    if (!drive.score && (drive.distanceMiles || 0) >= 1 && drive.coordinates?.length >= 2) {
+      drive.score = computeDriveScore(drive.coordinates, drive.distanceMiles);
+      backfillUpdates.push(updateDriveById(drive.id, { score: drive.score }));
+    }
+  }
+  if (backfillUpdates.length) await Promise.all(backfillUpdates);
+
   // Build a name → photo map for O(1) lookup per drive.
   const vehiclePhotoMap = new Map(vehicles.map(v => [v.name, v.photo || null]));
 
   historyList.innerHTML = '';
-  drives.forEach(drive => {
-    // Lazy backfill: compute + persist score for drives that pre-date v1.4.0.
-    if (!drive.score && (drive.distanceMiles || 0) >= 1 && drive.coordinates?.length >= 2) {
-      drive.score = computeDriveScore(drive.coordinates, drive.distanceMiles);
-      updateDriveById(drive.id, { score: drive.score });
-    }
-    const date      = new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    const time      = new Date(drive.startedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    const partLabel = drive.totalParts ? ` — Part ${drive.partNumber} of ${drive.totalParts}` : '';
-    const baseName  = `${(drive.vehicle || 'Drive').replace(/\s+/g, '_')}_${new Date(drive.startedAt).toISOString().slice(0,10)}`;
-    const photo    = vehiclePhotoMap.get(drive.vehicle);
-    const thumbHTML = photo
-      ? `<img src="${photo}" class="history-vehicle-thumb" alt="${drive.vehicle}" />`
-      : `<div class="history-vehicle-thumb history-vehicle-thumb-default">${DEFAULT_CAR_SVG}</div>`;
+  let rendered = 0;
 
-    const item     = document.createElement('div');
-    item.className = 'history-item';
-    item.innerHTML = `
-      <div class="history-item-body">
-        ${thumbHTML}
-        <div class="history-item-content">
-          <div class="history-item-header">
-            <span class="history-item-title">${drive.vehicle || 'Unknown Vehicle'}${partLabel}</span>
-            <span class="history-item-date">${date} ${time}</span>
+  function renderPage() {
+    historyObserver?.disconnect();
+    historyObserver = null;
+
+    const page = drives.slice(rendered, rendered + HISTORY_PAGE_SIZE);
+    page.forEach(drive => {
+      const date       = new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      const time       = new Date(drive.startedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const partLabel  = drive.totalParts ? ` — Part ${drive.partNumber} of ${drive.totalParts}` : '';
+      const baseName   = `${(drive.vehicle || 'Drive').replace(/\s+/g, '_')}_${new Date(drive.startedAt).toISOString().slice(0,10)}`;
+      const photo      = vehiclePhotoMap.get(drive.vehicle);
+      const vSafe      = escapeHTML(drive.vehicle || 'Unknown Vehicle');
+      const driveLabel = `${vSafe}${escapeHTML(partLabel)}, ${date}`;
+
+      const thumbHTML = photo
+        ? `<img src="${escapeHTML(photo)}" class="history-vehicle-thumb" alt="${vSafe}" />`
+        : `<div class="history-vehicle-thumb history-vehicle-thumb-default">${DEFAULT_CAR_SVG}</div>`;
+
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      item.setAttribute('role', 'listitem');
+      item.innerHTML = `
+        <div class="history-item-body">
+          ${thumbHTML}
+          <div class="history-item-content">
+            <div class="history-item-header">
+              <span class="history-item-title">${vSafe}${escapeHTML(partLabel)}</span>
+              <span class="history-item-date">${date} ${time}</span>
+            </div>
+            <div class="history-item-stats">
+              <div class="history-stat"><span class="history-stat-label">Distance</span><span class="history-stat-value">${drive.distanceMiles.toFixed(2)} mi</span></div>
+              <div class="history-stat"><span class="history-stat-label">Duration</span><span class="history-stat-value">${formatDuration(drive.durationSeconds)}</span></div>
+              <div class="history-stat"><span class="history-stat-label">Score</span><span class="history-stat-value">${drive.score ? gradeBadgeHTML(drive.score.grade) : '<span style="color:var(--text-muted)">—</span>'}</span></div>
+            </div>
+            <div class="history-item-actions">
+              <button class="export-btn map-view-btn" data-format="map" aria-label="View map for ${driveLabel}">🗺 Map</button>
+              <button class="export-btn" data-format="gpx" aria-label="Export GPX for ${driveLabel}">↓ GPX</button>
+              <button class="export-btn" data-format="kml" aria-label="Export KML for ${driveLabel}">↓ KML</button>
+              <button class="export-btn" data-format="ai" aria-label="Copy AI export for ${driveLabel}">⊕ AI</button>
+              <button class="export-btn delete-btn" data-format="delete" aria-label="Delete ${driveLabel}" style="margin-left:auto">🗑 Delete</button>
+            </div>
           </div>
-          <div class="history-item-stats">
-            <div class="history-stat"><span class="history-stat-label">Distance</span><span class="history-stat-value">${drive.distanceMiles.toFixed(2)} mi</span></div>
-            <div class="history-stat"><span class="history-stat-label">Duration</span><span class="history-stat-value">${formatDuration(drive.durationSeconds)}</span></div>
-            <div class="history-stat"><span class="history-stat-label">Score</span><span class="history-stat-value">${drive.score ? gradeBadgeHTML(drive.score.grade) : '<span style="color:var(--text-muted)">—</span>'}</span></div>
-          </div>
-          <div class="history-item-actions">
-            <button class="export-btn map-view-btn" data-id="${drive.id}" data-format="map">🗺 Map</button>
-            <button class="export-btn" data-id="${drive.id}" data-format="gpx">↓ GPX</button>
-            <button class="export-btn" data-id="${drive.id}" data-format="kml">↓ KML</button>
-            <button class="export-btn" data-id="${drive.id}" data-format="ai">⊕ AI</button>
-            <button class="export-btn delete-btn" data-id="${drive.id}" data-format="delete" style="margin-left:auto">🗑 Delete</button>
-          </div>
-        </div>
-      </div>`;
-    item.querySelectorAll('.export-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const format = btn.dataset.format;
-        const id     = Number(btn.dataset.id);
-        if (format === 'delete') {
-          const label = drive.totalParts
-            ? `Delete all ${drive.totalParts} parts of this drive?`
-            : 'Delete this drive permanently?';
-          if (!confirm(label)) return;
-          // Delete all parts of a multi-part drive together.
-          const parts = await getDriveGroup(drive);
-          for (const part of parts) await deleteDrive(part.id);
-          renderHistory();
-          return;
-        }
-        if (format === 'map') { openDriveMap(drive); return; }
-        // For GPX/KML/AI combine all parts into one export.
-        const parts     = await getDriveGroup(drive);
-        const combined  = { ...drive, coordinates: parts.flatMap(p => p.coordinates || []) };
-        if (format === 'gpx') downloadFile(buildGPX(combined), `${baseName}.gpx`, 'application/gpx+xml');
-        if (format === 'kml') downloadFile(buildKML(combined), `${baseName}.kml`, 'application/vnd.google-earth.kml+xml');
-        if (format === 'ai') {
-          try {
-            await navigator.clipboard.writeText(buildAIExport(combined));
-            showToast('Copied for AI ✓');
-          } catch {
-            showToast('Copy failed — try again', 3000);
+        </div>`;
+
+      const actionsEl = item.querySelector('.history-item-actions');
+
+      item.querySelectorAll('.export-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const format = btn.dataset.format;
+
+          if (format === 'delete') {
+            const confirmEl = document.createElement('div');
+            confirmEl.className = 'history-delete-confirm';
+            const confirmLabel = drive.totalParts
+              ? `Delete all ${drive.totalParts} parts?`
+              : 'Delete permanently?';
+            confirmEl.innerHTML = `
+              <span>${escapeHTML(confirmLabel)}</span>
+              <button class="export-btn confirm-yes" aria-label="Confirm delete ${driveLabel}">Yes, delete</button>
+              <button class="export-btn confirm-no" aria-label="Cancel delete">Cancel</button>`;
+            actionsEl.replaceWith(confirmEl);
+            confirmEl.querySelector('.confirm-yes').addEventListener('click', async () => {
+              const parts = drive.driveGroupId
+                ? drives.filter(d => d.driveGroupId === drive.driveGroupId).sort((a, b) => a.partNumber - b.partNumber)
+                : [drive];
+              for (const part of parts) await deleteDrive(part.id);
+              historyDirty = true;
+              renderHistory();
+            });
+            confirmEl.querySelector('.confirm-no').addEventListener('click', () => {
+              confirmEl.replaceWith(actionsEl);
+            });
+            return;
           }
-        }
+
+          if (format === 'map') { openDriveMap(drive); return; }
+
+          // GPX / KML / AI — use in-memory drives array, no extra IDB read.
+          const parts = drive.driveGroupId
+            ? drives.filter(d => d.driveGroupId === drive.driveGroupId).sort((a, b) => a.partNumber - b.partNumber)
+            : [drive];
+          const combined = { ...drive, coordinates: parts.flatMap(p => p.coordinates || []) };
+          if (format === 'gpx') downloadFile(buildGPX(combined), `${baseName}.gpx`, 'application/gpx+xml');
+          if (format === 'kml') downloadFile(buildKML(combined), `${baseName}.kml`, 'application/vnd.google-earth.kml+xml');
+          if (format === 'ai') {
+            try {
+              await navigator.clipboard.writeText(buildAIExport(combined));
+              showToast('Copied for AI ✓');
+            } catch {
+              showToast('Copy failed — try again', 3000);
+            }
+          }
+        });
       });
+
+      historyList.appendChild(item);
     });
-    historyList.appendChild(item);
-  });
+
+    rendered += page.length;
+
+    // Attach IntersectionObserver sentinel if more drives remain.
+    // rAF defers the initial check until layout has settled so the sentinel
+    // isn't immediately considered visible before overflow is computed.
+    if (rendered < drives.length) {
+      const sentinel = document.createElement('div');
+      sentinel.className = 'history-sentinel';
+      historyList.appendChild(sentinel);
+      historyObserver = new IntersectionObserver(entries => {
+        if (entries[0].isIntersecting) renderPage();
+      }, { root: historyList, threshold: 0 });
+      requestAnimationFrame(() => {
+        if (sentinel.parentElement) historyObserver.observe(sentinel);
+      });
+    }
+  }
+
+  renderPage();
+  historyDirty = false;
 }
 
-// History panel open / close helpers (called from hamburger menu).
-function openHistory() {
-  historyOverlay.classList.add('open');
-  renderHistory();
+// ── Focus trap ──────────────────────────────────────────────────────────────
+let _historyOpener = null;
+
+function _historyTrapKey(e) {
+  if (e.key === 'Escape') { closeHistory(); return; }
+  if (e.key !== 'Tab') return;
+  const focusable = Array.from(historyPanel.querySelectorAll(
+    'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  ));
+  if (!focusable.length) { e.preventDefault(); return; }
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (e.shiftKey) {
+    if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+  } else {
+    if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
 }
-document.getElementById('history-close').addEventListener('click', () => historyOverlay.classList.remove('open'));
-historyOverlay.addEventListener('click', e => { if (e.target === historyOverlay) historyOverlay.classList.remove('open'); });
+
+// ── Open / close ─────────────────────────────────────────────────────────────
+function openHistory() {
+  if (historyDirty) renderHistory();
+  _historyOpener = document.activeElement;
+  HISTORY_INERT_TARGETS.forEach(el => el?.setAttribute('inert', ''));
+  historyOverlay.classList.add('open');
+  document.getElementById('history-close').focus();
+  document.addEventListener('keydown', _historyTrapKey);
+}
+
+function closeHistory() {
+  historyObserver?.disconnect();
+  historyObserver = null;
+  historyOverlay.classList.remove('open');
+  HISTORY_INERT_TARGETS.forEach(el => el?.removeAttribute('inert'));
+  document.removeEventListener('keydown', _historyTrapKey);
+  _historyOpener?.focus();
+  _historyOpener = null;
+}
+
+document.getElementById('history-close').addEventListener('click', closeHistory);
+historyOverlay.addEventListener('click', e => { if (e.target === historyOverlay) closeHistory(); });
 window.renderHistory = renderHistory;
 
 // ─── Hamburger menu ───────────────────────────────────────────────────────────

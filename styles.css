@@ -571,6 +571,7 @@ body {
   border-top-right-radius: 20px;
   width: 100%;
   max-height: 75vh;
+  max-height: 75dvh;
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--border-mid);
@@ -729,11 +730,31 @@ body {
   padding: 40px 0;
 }
 
-/* Map button — desktop only (hidden on small screens / phone mounts) */
-.map-view-btn { display: none; }
-@media (min-width: 640px) {
-  .map-view-btn { display: inline-flex; }
+/* Compact button sizing on narrow screens so all five actions fit */
+@media (max-width: 400px) {
+  .export-btn { padding: 4px 7px; font-size: 10px; }
 }
+
+/* Inline delete confirmation row */
+.history-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.history-delete-confirm > span {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.history-delete-confirm .confirm-yes {
+  background: rgba(239,68,68,.12);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+.history-delete-confirm .confirm-yes:hover { background: rgba(239,68,68,.22); }
+.history-delete-confirm .confirm-no { color: var(--text-muted); }
 
 /* ── 13. SW update toast ─────────────────────────────────── */
 #update-toast {

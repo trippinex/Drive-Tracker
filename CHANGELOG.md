@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] - 2026-06-06
+
+### Fixed
+
+#### Security
+- **XSS hardening** — all user-supplied strings (vehicle name, error messages, photo URLs) are now HTML-escaped before injection into `innerHTML`; previously a crafted vehicle name could break out of attributes or inject markup
+
+#### Accessibility
+- **Focus trap** — keyboard focus is now constrained within the Drive History panel while it is open; Tab / Shift+Tab cycle only through panel controls
+- **Escape to close** — pressing Escape closes the panel (consistent with every other overlay in the app)
+- **Focus restoration** — focus returns to the element that opened the panel (hamburger menu → History button) when the panel closes
+- **`role="listitem"`** added to each drive card, correctly pairing with the existing `role="list"` on the history container
+- **Accessible button labels** — all five action buttons (Map, GPX, KML, AI, Delete) now carry descriptive `aria-label` values that include the vehicle name and date (e.g. "Export GPX for Toyota Camry, Mon Jun 3")
+- **`inert` on background** — the app header and main content area are marked `inert` while the panel is open, preventing assistive technologies from navigating to background content
+
+#### Performance
+- **Dirty-flag caching** — `renderHistory()` is only called when data has actually changed (after a delete or after saving a new drive); reopening an unchanged panel is now instant
+- **IntersectionObserver pagination** — only the first 20 drives are rendered to the DOM on open; a sentinel element at the bottom of the list triggers the next 20 as the user scrolls, keeping DOM size bounded regardless of how many drives accumulate
+- **Eliminated per-action IDB re-reads** — export (GPX / KML / AI) and delete button handlers now use the in-memory drives array captured at render time instead of issuing a new `getAllDrives()` IndexedDB read per click
+- **Batched score backfill** — pre-v1.4.0 drives requiring a lazy score backfill are now computed and written to IndexedDB in a single `Promise.all` before the DOM is touched, eliminating concurrent fire-and-forget writes
+
+#### Mobile / UX
+- **Dynamic viewport height** — history panel `max-height` now uses `75dvh` (with `75vh` fallback) so the panel respects the mobile browser chrome on iOS Safari and Android Chrome
+- **Inline delete confirmation** — the Delete button now replaces the action row in-place with "Delete permanently? [Yes, delete] [Cancel]" instead of using `window.confirm()`, which is unreliable in standalone PWA mode on Android
+- **Map button on all screen sizes** — the 🗺 Map button is now visible on mobile (was desktop-only); all five action buttons wrap cleanly on narrow screens
+
+---
+
 ## [1.4.0] - 2026-06-04
 
 ### Added
