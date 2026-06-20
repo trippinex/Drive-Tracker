@@ -6,7 +6,7 @@ BUCKET="gs://drive-tracker-497900"
 echo "Deploying to $BUCKET..."
 
 gsutil -m rsync -r -d \
-  -x "sw\.js|\.git|\.env|\.claude|\.firebase|DEPLOY\.md|CHANGELOG\.md|README\.md|ROADMAP\.md|cloudbuild\.yaml|generate-config\.ps1|firebase\.json|\.firebaserc|deploy\.sh|ui-theme/" \
+  -x "sw\.js|\.git|\.env|\.claude|\.firebase|DEPLOY\.md|CHANGELOG\.md|README\.md|ROADMAP\.md|cloudbuild\.yaml|generate-config\.ps1|firebase\.json|\.firebaserc|deploy\.sh|ui-theme/|graphify-out/|config\.js" \
   . "$BUCKET"
 
 # ui-theme/theme.css is required by the service worker shell — deploy it explicitly
