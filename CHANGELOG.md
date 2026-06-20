@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.1] - 2026-06-20
+
+### Fixed
+
+- **Drive recovery after OS kill** — pausing a drive and switching to another app could cause the OS to evict the browser tab, losing all recorded data. The app now saves a draft to IndexedDB on pause, on page hide, and every 30 seconds during active recording. On next launch, if a draft with sufficient data is found, a modal offers to resume the interrupted drive or discard it.
+
+---
+
 ## [1.5.0] - 2026-06-06
 
 ### Fixed

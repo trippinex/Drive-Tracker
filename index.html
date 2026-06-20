@@ -59,7 +59,7 @@
   </script>
 
   <!-- DriveTracker custom styles -->
-  <link rel="stylesheet" href="/styles.css?v=28" />
+  <link rel="stylesheet" href="/styles.css?v=29" />
 </head>
 
 <!-- overflow handled in styles.css via dvh; removed from class to not clip iOS safe-area -->
@@ -473,6 +473,19 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════
+       DRIVE RECOVERY MODAL — shown on launch when a draft is found
+       ══════════════════════════════════════════════════ -->
+  <div id="recovery-overlay" class="drive-summary-overlay" role="dialog" aria-modal="true" aria-label="Recover drive" hidden>
+    <div class="drive-summary-panel">
+      <div class="drive-summary-title">Recover Drive?</div>
+      <p class="recovery-message">Your last drive was interrupted. Would you like to resume it?</p>
+      <p id="recovery-detail" class="recovery-detail"></p>
+      <button id="recovery-resume-btn" class="btn-primary drive-summary-close-btn">Resume Drive</button>
+      <button id="recovery-discard-btn" class="btn-secondary recovery-discard-btn">Discard</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
        SW UPDATE TOAST
        ══════════════════════════════════════════════════ -->
   <div id="update-toast" role="alert">
@@ -525,7 +538,7 @@
        SCRIPTS
        ══════════════════════════════════════════════════ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/app.js?v=28"></script>
+  <script src="/app.js?v=29"></script>
 
   <!-- Firebase SDKs (compat build — no bundler needed) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>

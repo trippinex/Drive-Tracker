@@ -16,7 +16,7 @@
 'use strict';
 
 // Current app version — update this with every release.
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.5.1';
 const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
@@ -24,9 +24,10 @@ const APP_IS_BETA = false;
 // ═══════════════════════════════════════════════════════════════
 
 const DB_NAME        = 'drivelog';
-const DB_VERSION     = 5;           // v5: adds firestoreId index for cloud sync
+const DB_VERSION     = 6;           // v6: adds drive_draft store for crash recovery
 const DRIVES_STORE   = 'drives';
 const VEHICLES_STORE = 'vehicles';
+const DRAFT_STORE    = 'drive_draft';
 
 // Authenticated user's Firebase UID — set in initApp() after sign-in.
 // All DB reads/writes are scoped to this value.
@@ -83,6 +84,11 @@ function openDB() {
         const tx = e.target.transaction;
         tx.objectStore(DRIVES_STORE).createIndex('firestoreId', 'firestoreId', { unique: false });
         tx.objectStore(VEHICLES_STORE).createIndex('firestoreId', 'firestoreId', { unique: false });
+      }
+
+      // ── v6: add drive_draft store for crash/kill recovery.
+      if (oldVer < 6) {
+        db.createObjectStore(DRAFT_STORE, { keyPath: 'id' });
       }
     };
 
@@ -326,6 +332,55 @@ async function updateDriveById(localId, fields) {
       store.put({ ...get.result, ...fields }).onsuccess = resolve;
     };
     get.onerror = () => reject(get.error);
+  });
+}
+
+// ── Drive draft (crash / OS-kill recovery) ────────────────────────────────────
+
+async function saveDraft() {
+  if (!sessionState.active) return;
+  const db = await openDB();
+  const record = {
+    id:              1,
+    userId:          currentUserId,
+    startTime:       sessionState.startTime,
+    pausedAt:        sessionState.pausedAt,
+    totalPausedMs:   sessionState.totalPausedMs,
+    vehicle:         sessionState.vehicle,
+    coordinates:     [...sessionState.coordinates],
+    totalDistanceMi: sessionState.totalDistanceMi,
+    flushedPartIds:  [...sessionState.flushedPartIds],
+    driveGroupId:    sessionState.driveGroupId,
+    savedAt:         Date.now(),
+  };
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(DRAFT_STORE, 'readwrite');
+    const req = tx.objectStore(DRAFT_STORE).put(record);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function clearDraft() {
+  try {
+    const db = await openDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRAFT_STORE, 'readwrite');
+      tx.objectStore(DRAFT_STORE).clear().onsuccess = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {
+    console.warn('[Draft] clearDraft failed:', e);
+  }
+}
+
+async function loadDraft() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(DRAFT_STORE, 'readonly');
+    const req = tx.objectStore(DRAFT_STORE).get(1);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror   = () => reject(req.error);
   });
 }
 
@@ -681,7 +736,11 @@ async function releaseWakeLock() {
 }
 
 document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState === 'visible' && sessionState.active && !wakeLock) {
+  if (document.visibilityState === 'hidden') {
+    if (sessionState.active) saveDraft().catch(() => {});
+    return;
+  }
+  if (sessionState.active && !wakeLock) {
     await acquireWakeLock();
     setStatus('Screen lock re-acquired after returning to app.');
   }
@@ -727,9 +786,10 @@ const sessionState = {
   coordinates: [], totalDistanceMi: 0,
   timerInterval: null, vehicle: '',
   // Fix 5: rolling in-drive chunk flush
-  flushedPartIds: [],   // local IndexedDB IDs of parts saved mid-drive
-  driveGroupId:   null, // set on first flush; links all parts together
-  isFlushing:     false, // prevents concurrent flush operations
+  flushedPartIds:  [],   // local IndexedDB IDs of parts saved mid-drive
+  driveGroupId:    null, // set on first flush; links all parts together
+  isFlushing:      false, // prevents concurrent flush operations
+  draftHeartbeat:  null, // periodic draft save interval
 };
 
 // Fix 2: GPS gap detection
@@ -912,6 +972,9 @@ async function startDrive() {
   sessionState.flushedPartIds = [];  // Fix 5: reset rolling flush state
   sessionState.driveGroupId   = null;
   sessionState.isFlushing     = false;
+  sessionState.draftHeartbeat = setInterval(() => {
+    if (sessionState.active) saveDraft().catch(() => {});
+  }, 30_000);
   stopIdleWatch();
   hideLocationDot();
   showVehiclePhoto();
@@ -946,6 +1009,7 @@ async function pauseDrive() {
   sessionState.paused   = true;
   sessionState.pausedAt = Date.now();
   await releaseWakeLock();
+  saveDraft().catch(() => {});
   setCTAState('paused');
   setStatus('Drive paused. Tap Resume to continue.');
 }
@@ -980,6 +1044,8 @@ async function stopDrive() {
   sessionState.timerInterval = null;
   clearInterval(wakeLockHeartbeat);    // Fix 3: stop heartbeat
   wakeLockHeartbeat = null;
+  clearInterval(sessionState.draftHeartbeat);
+  sessionState.draftHeartbeat = null;
   hideVehiclePhoto();
   await releaseWakeLock();
 
@@ -1073,6 +1139,7 @@ async function stopDrive() {
     setStatus('Drive cancelled — too few GPS points recorded.');
   }
 
+  await clearDraft();
   clearCarMarker();     // remove the drive's car marker so blue dot is visible again
   setCTAState('start');
   document.getElementById('vehicle-select').disabled = false;
@@ -2115,6 +2182,101 @@ function previewLocation() {
 
 // ── Bootstrap ─────────────────────────────────────────────────
 // registerSW runs immediately — no auth needed.
+// ── Drive crash/kill recovery ────────────────────────────────────────────────
+
+async function checkForDraft() {
+  let draft;
+  try { draft = await loadDraft(); } catch (e) { return; }
+  if (!draft) return;
+  if (draft.userId !== currentUserId) { await clearDraft(); return; }
+  const hasEnoughData = draft.coordinates.length >= 3 || draft.flushedPartIds.length > 0;
+  if (!hasEnoughData) { await clearDraft(); return; }
+  showRecoveryModal(draft);
+}
+
+function showRecoveryModal(draft) {
+  const elapsed = Math.floor((Date.now() - draft.startTime - draft.totalPausedMs) / 1000);
+  document.getElementById('recovery-detail').textContent =
+    `${draft.vehicle} · ${draft.totalDistanceMi.toFixed(2)} mi · ${formatDuration(elapsed)}`;
+  document.getElementById('recovery-overlay').removeAttribute('hidden');
+
+  document.getElementById('recovery-resume-btn').onclick = async () => {
+    document.getElementById('recovery-overlay').setAttribute('hidden', '');
+    await resumeFromDraft(draft);
+  };
+  document.getElementById('recovery-discard-btn').onclick = async () => {
+    document.getElementById('recovery-overlay').setAttribute('hidden', '');
+    await clearDraft();
+  };
+}
+
+async function resumeFromDraft(draft) {
+  sessionState.active          = true;
+  sessionState.paused          = true;
+  sessionState.startTime       = draft.startTime;
+  sessionState.totalPausedMs   = draft.totalPausedMs;
+  sessionState.pausedAt        = draft.pausedAt ?? Date.now();
+  sessionState.coordinates     = draft.coordinates;
+  sessionState.totalDistanceMi = draft.totalDistanceMi;
+  sessionState.vehicle         = draft.vehicle;
+  sessionState.flushedPartIds  = draft.flushedPartIds;
+  sessionState.driveGroupId    = draft.driveGroupId;
+  sessionState.isFlushing      = false;
+
+  const sel   = document.getElementById('vehicle-select');
+  sel.value   = draft.vehicle;
+  sel.disabled = true;
+
+  lastRecordedTs   = 0;
+  lastGPSTimestamp = 0;
+  gapCount         = 0;
+
+  // Redraw the recovered route on the map.
+  if (draft.coordinates.length >= 2) {
+    const latlngs = draft.coordinates.map(c => L.latLng(c.lat, c.lng));
+    routePolyline = L.polyline(latlngs, { color: '#f97316', weight: 4, opacity: 0.9 }).addTo(map);
+    panToPosition(latlngs[latlngs.length - 1]);
+  }
+
+  stopIdleWatch();
+  hideLocationDot();
+  showVehiclePhoto();
+
+  sessionState.watchId = navigator.geolocation.watchPosition(
+    onPositionUpdate, onPositionError,
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+
+  sessionState.timerInterval = setInterval(() => {
+    if (sessionState.paused) return;
+    els.duration.textContent = formatDuration(getElapsedSeconds());
+  }, 1000);
+
+  wakeLockHeartbeat = setInterval(async () => {
+    if (!sessionState.active) return;
+    if (!wakeLock) {
+      await acquireWakeLock();
+      if (!wakeLock) setStatus('⚠️ Screen lock lost — screen may dim during drive.');
+    }
+  }, 5 * 60 * 1000);
+
+  sessionState.draftHeartbeat = setInterval(() => {
+    if (sessionState.active) saveDraft().catch(() => {});
+  }, 30_000);
+
+  await clearDraft();
+
+  updateTelemetry({
+    speedMph:       0,
+    distanceMiles:  sessionState.totalDistanceMi,
+    elapsedSeconds: getElapsedSeconds(),
+    altitudeM:      null,
+    accuracyM:      null,
+  });
+  setCTAState('paused');
+  setStatus('Drive recovered. Tap Resume to continue.');
+}
+
 // initApp is called by auth.js once Google sign-in is verified.
 window.addEventListener('DOMContentLoaded', () => {
   registerSW();
@@ -2153,4 +2315,5 @@ window.initApp = async function initApp(user) {
   setCTAState('start');
   previewLocation();
   handleDeepLink();
+  await checkForDraft();
 };

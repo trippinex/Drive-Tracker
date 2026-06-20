@@ -1015,6 +1015,33 @@ body {
 
 .drive-summary-close-btn { width: 100%; }
 
+/* ── 15c. Drive recovery modal ───────────────────────────── */
+.recovery-message {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 0;
+}
+.recovery-detail {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  margin: 0;
+}
+.recovery-discard-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border-mid);
+  color: var(--text-muted);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.recovery-discard-btn:hover { background: var(--surface-3); }
+
 /* ── 16. Login overlay ───────────────────────────────────── */
 /*
    Full-screen overlay shown before sign-in.
