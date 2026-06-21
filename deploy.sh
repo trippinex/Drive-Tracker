@@ -28,6 +28,6 @@ gsutil setmeta -h "Cache-Control:public, max-age=300" "$BUCKET/ui-theme/theme.cs
 # Best-effort CDN invalidation for immediate propagation.
 # Requires compute.urlMaps.invalidateCache permission (see BUG-001).
 # Degrades gracefully to the 5-minute TTL above if this fails.
-gcloud compute url-maps invalidate-cdn-cache drive-tracker-urlmap --path "/*" --async || true
+gcloud compute url-maps invalidate-cdn-cache drive-tracker-urlmap --path "/*" --async --project drive-tracker-497900
 
 echo "Done. Live at https://drivetracker.soccerwrek.net"
