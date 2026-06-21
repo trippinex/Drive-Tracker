@@ -21,6 +21,14 @@ Update this file when a feature moves from one stage to the next.
 
 ---
 
+## 🐛 Defects — Next Up
+
+| ID | Defect | Notes |
+|---|---|---|
+| BUG-001 | CDN cache invalidation permission error on manual deploy | `gcloud compute url-maps invalidate-cdn-cache` fails with `compute.urlMaps.invalidateCache` permission denied on the `drive-tracker-urlmap` URL map. Deploy still works because versioned `?v=N` asset URLs are new CDN cache entries, but the CDN is never explicitly flushed. Fix: grant `roles/compute.networkAdmin` or a custom role with `compute.urlMaps.invalidateCache` to the deploying principal in GCP IAM. |
+
+---
+
 ## 📋 Backlog
 
 | ID | Feature | Notes |
