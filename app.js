@@ -16,7 +16,7 @@
 'use strict';
 
 // Current app version — update this with every release.
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.6.0';
 const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
@@ -1443,14 +1443,27 @@ async function getDriveGroup(drive) {
 /** Open the drive route in a full-screen map in a new browser tab. */
 async function openDriveMap(drive) {
   // Combine all parts for multi-part drives so the full route is shown.
-  const parts     = await getDriveGroup(drive);
-  const allCoords = parts.flatMap(p => p.coordinates || []);
-  const score     = drive.score || computeDriveScore(allCoords, drive.distanceMiles || 0);
-  const coords    = allCoords.map(c => [c.lat, c.lng]);
-  const title   = `${drive.vehicle || 'Drive'} — ${new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
-  const stats   = `${(drive.distanceMiles || 0).toFixed(2)} mi &nbsp;·&nbsp; ${formatDuration(drive.durationSeconds || 0)}`;
+  const parts      = await getDriveGroup(drive);
+  const allCoords  = parts.flatMap(p => p.coordinates || []);
+  const score      = drive.score || computeDriveScore(allCoords, drive.distanceMiles || 0);
+  const coords     = allCoords.map(c => [c.lat, c.lng]);
+  const title      = `${drive.vehicle || 'Drive'} — ${new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
+  const stats      = `${(drive.distanceMiles || 0).toFixed(2)} mi &nbsp;·&nbsp; ${formatDuration(drive.durationSeconds || 0)}`;
 
-  // Build arrows data: one every 8 coords
+  // Full coordinate data for the replay engine (speed converted to MPH).
+  const replayCoords = allCoords.map(c => ({
+    lat:   c.lat,
+    lng:   c.lng,
+    speed: (c.speed != null && c.speed >= 0) ? parseFloat(mpsToMph(c.speed).toFixed(1)) : null,
+    ts:    c.ts || 0,
+  }));
+
+  // Look up the vehicle photo for the replay marker; fall back to chevron if absent.
+  const vehicles     = await getAllVehicles();
+  const vehicleRec   = vehicles.find(v => v.name === drive.vehicle);
+  const vehiclePhoto = vehicleRec?.photo || null;
+
+  // Build static direction arrows: one every 8 coords.
   const arrowData = [];
   for (let i = 8; i < coords.length; i += 8) {
     const p = coords[i - 1], c = coords[i];
@@ -1471,55 +1484,135 @@ async function openDriveMap(drive) {
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; height: 100%; background: #f8fafc; font-family: system-ui, sans-serif; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; font-family: system-ui, sans-serif; }
     #map { position: absolute; inset: 0; }
-    #info {
-      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+
+    /* Shared glass pill */
+    .glass-pill {
+      position: fixed; left: 50%; transform: translateX(-50%);
       background: rgba(15,23,42,0.92); color: #f1f5f9;
-      padding: 10px 20px; border-radius: 10px; z-index: 1000;
-      display: flex; align-items: center; gap: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3); backdrop-filter: blur(8px);
+      border-radius: 12px; z-index: 1000;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
       white-space: nowrap;
     }
-    #info strong { color: #f97316; font-size: 14px; }
+
+    /* Drive info pill */
+    #info { top: 14px; padding: 10px 20px; display: flex; align-items: center; gap: 16px; }
+    #info strong { color: #f97316; font-size: 14px; font-weight: 700; }
     #info span   { font-size: 13px; color: #94a3b8; }
-    .route-arrow { display: flex; align-items: center; justify-content: center; }
+
+    /* Replay HUD */
+    #replay-hud { top: 72px; padding: 8px 24px; display: flex; align-items: center; gap: 24px; }
+    .hud-item  { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .hud-label { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; }
+    .hud-value { font-size: 15px; font-weight: 700; color: #f1f5f9; font-variant-numeric: tabular-nums; }
+
+    /* Replay controls */
+    #replay-controls { bottom: 80px; padding: 8px 12px; display: flex; align-items: center; gap: 6px; }
+    .rp-btn {
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      min-width: 44px; min-height: 44px; padding: 0 12px;
+      border: none; border-radius: 9px; cursor: pointer;
+      font-size: 13px; font-weight: 600; font-family: system-ui, sans-serif;
+      background: rgba(255,255,255,0.08); color: #f1f5f9;
+      transition: background 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rp-btn:hover  { background: rgba(255,255,255,0.15); }
+    .rp-btn:active { transform: scale(0.92); }
+    .rp-btn.primary { background: #f97316; color: #fff; min-width: 52px; }
+    .rp-btn.primary:hover { background: #ea580c; }
+    #rp-speed.active { color: #f97316; font-weight: 800; }
+    .rp-label { display: none; }
+    @media (min-width: 480px) { .rp-label { display: inline; } }
+    .rp-divider { width: 1px; height: 26px; background: rgba(255,255,255,0.12); margin: 0 2px; flex-shrink: 0; }
+
+    /* DNA pill */
     #dna {
-      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-      background: rgba(15,23,42,0.92); color: #f1f5f9;
-      padding: 10px 16px; border-radius: 12px; z-index: 1000;
+      bottom: 16px; padding: 10px 16px;
       display: flex; align-items: center; justify-content: center;
-      flex-wrap: wrap; gap: 10px 14px;
-      max-width: calc(100vw - 32px);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3); backdrop-filter: blur(8px);
-      font-family: system-ui, sans-serif;
+      flex-wrap: wrap; gap: 10px 14px; max-width: calc(100vw - 32px);
     }
     .dna-grade { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 2px; }
     .dna-item  { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+
+    /* Route direction arrows */
+    .route-arrow { display: flex; align-items: center; justify-content: center; }
+
+    /* Replay marker */
+    .rp-photo   { width: 56px; height: 56px; object-fit: contain; display: block; border-radius: 8px; }
+    .rp-chevron { display: flex; align-items: center; justify-content: center; transform-origin: center center; }
   </style>
 </head>
 <body>
-  <div id="info">
-    <strong>${drive.vehicle || 'Drive'}</strong>
+  <div id="info" class="glass-pill">
+    <strong>${escapeHTML(drive.vehicle || 'Drive')}</strong>
     <span>${new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
     <span>${stats}</span>
   </div>
+
+  <div id="replay-hud" class="glass-pill">
+    <div class="hud-item">
+      <span class="hud-label">Time</span>
+      <span class="hud-value" id="hud-time">--:-- --</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">Speed</span>
+      <span class="hud-value" id="hud-speed">-- MPH</span>
+    </div>
+  </div>
+
   <div id="map"></div>
-  <div id="dna">${buildDnaHTML(score)}</div>
+
+  <div id="replay-controls" class="glass-pill">
+    <button class="rp-btn" id="rp-stop" title="Stop">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><rect x="0" y="0" width="13" height="13" rx="2"/></svg>
+      <span class="rp-label">Stop</span>
+    </button>
+    <div class="rp-divider"></div>
+    <button class="rp-btn" id="rp-back" title="Back 10 minutes">
+      <svg width="16" height="13" viewBox="0 0 16 13" fill="currentColor">
+        <polygon points="7,0 0,6.5 7,13 7,8.5 14,13 14,0 7,4.5"/>
+        <rect x="14.5" y="0" width="1.5" height="13" rx="0.75"/>
+      </svg>
+      <span class="rp-label">−10m</span>
+    </button>
+    <button class="rp-btn primary" id="rp-playpause" title="Play / Pause">
+      <svg id="rp-play-icon"  width="11" height="13" viewBox="0 0 11 13" fill="currentColor"><polygon points="0,0 11,6.5 0,13"/></svg>
+      <svg id="rp-pause-icon" width="11" height="13" viewBox="0 0 11 13" fill="currentColor" style="display:none"><rect x="0" y="0" width="4" height="13" rx="1"/><rect x="7" y="0" width="4" height="13" rx="1"/></svg>
+    </button>
+    <button class="rp-btn" id="rp-fwd" title="Forward 10 minutes">
+      <svg width="16" height="13" viewBox="0 0 16 13" fill="currentColor">
+        <rect x="0" y="0" width="1.5" height="13" rx="0.75"/>
+        <polygon points="2,0 9,4.5 9,0 16,6.5 9,13 9,8.5 2,13"/>
+      </svg>
+      <span class="rp-label">+10m</span>
+    </button>
+    <div class="rp-divider"></div>
+    <button class="rp-btn" id="rp-speed" title="Playback speed">1×</button>
+  </div>
+
+  <div id="dna" class="glass-pill">${buildDnaHTML(score)}</div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const coords    = ${JSON.stringify(coords)};
-    const arrowData = ${JSON.stringify(arrowData)};
+    const coords       = ${JSON.stringify(coords)};
+    const arrowData    = ${JSON.stringify(arrowData)};
+    const replayCoords = ${JSON.stringify(replayCoords)};
+    const vehiclePhoto = ${JSON.stringify(vehiclePhoto)};
+    const SPEEDS       = [1, 2, 4, 8, 16, 32];
 
+    // ── Map ──────────────────────────────────────────────────────
     const map = L.map('map', { zoomControl: true });
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 19
     }).addTo(map);
 
+    let poly = null;
     if (coords.length > 1) {
-      const poly = L.polyline(coords, { color: '#f97316', weight: 4, opacity: 0.9 }).addTo(map);
+      poly = L.polyline(coords, { color: '#f97316', weight: 4, opacity: 0.9 }).addTo(map);
 
-      // Direction arrows
       arrowData.forEach(a => {
         L.marker([a.lat, a.lng], {
           icon: L.divIcon({
@@ -1534,17 +1627,218 @@ async function openDriveMap(drive) {
         }).addTo(map);
       });
 
-      // Start marker (green)
       L.circleMarker(coords[0], { radius: 7, color: '#fff', weight: 2, fillColor: '#22c55e', fillOpacity: 1 })
-       .bindTooltip('Start', { permanent: false }).addTo(map);
-
-      // End marker (red)
+       .bindTooltip('Start').addTo(map);
       L.circleMarker(coords[coords.length - 1], { radius: 7, color: '#fff', weight: 2, fillColor: '#ef4444', fillOpacity: 1 })
-       .bindTooltip('End', { permanent: false }).addTo(map);
+       .bindTooltip('End').addTo(map);
 
       map.fitBounds(poly.getBounds(), { padding: [60, 60] });
     } else {
       map.setView([37.7749, -122.4194], 13);
+    }
+
+    // ── Replay engine ─────────────────────────────────────────────
+    const rc         = replayCoords;
+    const hasReplay  = rc.length >= 2 && rc[0].ts > 0 && rc[rc.length - 1].ts > rc[0].ts;
+
+    if (!hasReplay) {
+      const ctrl = document.getElementById('replay-controls');
+      ctrl.style.opacity = '0.35';
+      ctrl.style.pointerEvents = 'none';
+    } else {
+      const startTs = rc[0].ts;
+      const totalMs = rc[rc.length - 1].ts - startTs;
+
+      let state        = 'idle';
+      let speedIdx     = 0;
+      let seekMs       = 0;
+      let wallStart    = 0;
+      let animFrame    = null;
+      let lastBearing  = 0;
+
+      // ── Marker ─────────────────────────────────────────────────
+      function makeIcon(bearing) {
+        if (vehiclePhoto) {
+          return L.divIcon({
+            className: '',
+            html: '<img class="rp-photo" src="' + vehiclePhoto + '" />',
+            iconSize:   [56, 56],
+            iconAnchor: [28, 28],
+          });
+        }
+        return L.divIcon({
+          className: '',
+          html: '<div class="rp-chevron" style="transform:rotate(' + bearing + 'deg);">' +
+                  '<svg viewBox="0 0 18 26" width="18" height="26">' +
+                    '<polygon points="9,0 18,26 9,20 0,26" fill="#f97316" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>' +
+                  '</svg>' +
+                '</div>',
+          iconSize:   [18, 26],
+          iconAnchor: [9, 13],
+        });
+      }
+
+      const replayMarker = L.marker([rc[0].lat, rc[0].lng], {
+        icon: makeIcon(0), interactive: false, zIndexOffset: 1000,
+      }).addTo(map);
+
+      function updateBearing(bearing) {
+        if (vehiclePhoto) return;
+        const el = replayMarker.getElement();
+        if (!el) return;
+        const chev = el.querySelector('.rp-chevron');
+        if (chev) chev.style.transform = 'rotate(' + bearing + 'deg)';
+      }
+
+      // ── Math helpers ────────────────────────────────────────────
+      function getBrg(lat1, lon1, lat2, lon2) {
+        const r = Math.PI / 180;
+        const dL = (lon2 - lon1) * r;
+        const y  = Math.sin(dL) * Math.cos(lat2 * r);
+        const x  = Math.cos(lat1 * r) * Math.sin(lat2 * r) -
+                   Math.sin(lat1 * r) * Math.cos(lat2 * r) * Math.cos(dL);
+        return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+      }
+
+      function bracketIdx(elapsed) {
+        const target = startTs + elapsed;
+        let lo = 0, hi = rc.length - 1;
+        while (lo < hi - 1) {
+          const mid = (lo + hi) >>> 1;
+          if (rc[mid].ts <= target) lo = mid; else hi = mid;
+        }
+        return lo;
+      }
+
+      function interpolate(elapsed) {
+        const i  = bracketIdx(elapsed);
+        const p0 = rc[i];
+        const p1 = rc[Math.min(i + 1, rc.length - 1)];
+        if (p0 === p1 || p1.ts === p0.ts) {
+          return { lat: p0.lat, lng: p0.lng, speed: p0.speed, bearing: lastBearing };
+        }
+        const t   = (startTs + elapsed - p0.ts) / (p1.ts - p0.ts);
+        const lat = p0.lat + t * (p1.lat - p0.lat);
+        const lng = p0.lng + t * (p1.lng - p0.lng);
+        const speed = (p0.speed != null && p1.speed != null)
+          ? p0.speed + t * (p1.speed - p0.speed)
+          : (p0.speed ?? p1.speed ?? null);
+        return { lat, lng, speed, bearing: getBrg(p0.lat, p0.lng, p1.lat, p1.lng) };
+      }
+
+      function fmtTime(ts) {
+        const d = new Date(ts);
+        let h = d.getHours(), m = d.getMinutes(), s = d.getSeconds();
+        const ap = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0') + ' ' + ap;
+      }
+
+      // ── Frame application ───────────────────────────────────────
+      function applyFrame(elapsed) {
+        const pt = interpolate(elapsed);
+        lastBearing = pt.bearing;
+        replayMarker.setLatLng([pt.lat, pt.lng]);
+        updateBearing(pt.bearing);
+        document.getElementById('hud-time').textContent  = fmtTime(startTs + elapsed);
+        document.getElementById('hud-speed').textContent = pt.speed != null
+          ? pt.speed.toFixed(1) + ' MPH' : '-- MPH';
+        const latD = 3 / 69;
+        const lngD = 3 / (69 * Math.cos(pt.lat * Math.PI / 180));
+        const carBox = L.latLngBounds(
+          [pt.lat - latD, pt.lng - lngD],
+          [pt.lat + latD, pt.lng + lngD]
+        );
+        if (!map.getBounds().contains(carBox)) {
+          map.panTo([pt.lat, pt.lng], { animate: true, duration: 0.5 });
+        }
+      }
+
+      function nowElapsed() {
+        const ms = state === 'playing'
+          ? Math.min((Date.now() - wallStart) * SPEEDS[speedIdx] + seekMs, totalMs)
+          : Math.min(seekMs, totalMs);
+        return ms;
+      }
+
+      function setPlayIcon(playing) {
+        document.getElementById('rp-play-icon').style.display  = playing ? 'none' : '';
+        document.getElementById('rp-pause-icon').style.display = playing ? ''     : 'none';
+      }
+
+      function tick() {
+        if (state !== 'playing') return;
+        const elapsed = nowElapsed();
+        applyFrame(elapsed);
+        if (elapsed >= totalMs) { toIdle(); return; }
+        animFrame = requestAnimationFrame(tick);
+      }
+
+      function zoomToMarker(lat, lng) {
+        const latD = 5 / 69;
+        const lngD = 5 / (69 * Math.cos(lat * Math.PI / 180));
+        map.fitBounds([[lat - latD, lng - lngD], [lat + latD, lng + lngD]], { animate: true, duration: 0.8 });
+      }
+
+      function zoomToRoute() {
+        if (poly) map.fitBounds(poly.getBounds(), { padding: [60, 60], animate: true, duration: 0.8 });
+      }
+
+      function toIdle() {
+        cancelAnimationFrame(animFrame);
+        state = 'idle'; seekMs = 0;
+        applyFrame(0);
+        setPlayIcon(false);
+        zoomToRoute();
+      }
+
+      // ── Controls ────────────────────────────────────────────────
+      document.getElementById('rp-playpause').addEventListener('click', () => {
+        if (state === 'idle' || state === 'paused') {
+          wallStart = Date.now();
+          state = 'playing';
+          setPlayIcon(true);
+          animFrame = requestAnimationFrame(tick);
+          const pt = interpolate(seekMs);
+          zoomToMarker(pt.lat, pt.lng);
+        } else {
+          seekMs = nowElapsed();
+          cancelAnimationFrame(animFrame);
+          state = 'paused';
+          setPlayIcon(false);
+        }
+      });
+
+      document.getElementById('rp-stop').addEventListener('click', () => {
+        cancelAnimationFrame(animFrame);
+        toIdle();
+      });
+
+      document.getElementById('rp-back').addEventListener('click', () => {
+        seekMs = Math.max(0, nowElapsed() - 600000);
+        if (state === 'playing') wallStart = Date.now();
+        applyFrame(seekMs);
+      });
+
+      document.getElementById('rp-fwd').addEventListener('click', () => {
+        seekMs = Math.min(totalMs, nowElapsed() + 600000);
+        if (state === 'playing') wallStart = Date.now();
+        applyFrame(seekMs);
+        if (seekMs >= totalMs) { cancelAnimationFrame(animFrame); toIdle(); }
+      });
+
+      document.getElementById('rp-speed').addEventListener('click', () => {
+        seekMs   = nowElapsed();
+        wallStart = Date.now();
+        speedIdx = (speedIdx + 1) % SPEEDS.length;
+        const spd = SPEEDS[speedIdx];
+        const btn = document.getElementById('rp-speed');
+        btn.textContent = spd + '\xd7';
+        btn.classList.toggle('active', spd > 1);
+      });
+
+      // Initialise HUD at drive start
+      applyFrame(0);
     }
   </script>
 </body>
