@@ -20,8 +20,11 @@ Update this file when a feature moves from one stage to the next.
 | v1.6.0 | Drive Replay / Animation (DT-008) |
 | v1.6.1 | Mobile map view fixes — bottom pill overlap, Safari popup block, zoom control collision, consistent pill spacing, CDN deploy pipeline |
 | v1.7.0 | POI Management Phase 1 (DT-018) — Firestore-backed POIs, 8 categories, Nominatim geocoding, management panel, map markers on all views, voice announcements with entry-detection |
-| v1.7.4 | Safari voice quality — prefer Samantha / Enhanced voices; fix voice selection precedence bug |
-| v1.7.5 | Safari voice respects iOS system TTS preference — no longer overrides user-selected voice |
+| v1.7.1 | POI voice announcements silent on mobile fix (BUG-002) — silent unlock utterance on first touch/click |
+| v1.7.2 | POI markers missing on mobile fix (BUG-003) — switched to inline styles for divIcon markers |
+| v1.7.3 | About modal version display fix — APP_VERSION was not bumped through patch releases |
+| v1.7.4 | Safari voice selection fix — prefer Enhanced voices; fix precedence bug in voice selection logic |
+| v1.7.5 | Safari voice respects iOS system TTS preference — no longer overrides user-selected voice (e.g. Ava Enhanced) |
 
 ---
 
