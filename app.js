@@ -1714,9 +1714,17 @@ async function openDriveMap(drive) {
       if(!vv.length)return;
       _blobVoice=vv.find(v=>v.name==='Google US English')||vv.find(v=>v.lang==='en-US')||null;
     }
+    function _unlockBlobSpeech(){
+      if(!window.speechSynthesis)return;
+      const u=new SpeechSynthesisUtterance('');u.volume=0;
+      speechSynthesis.speak(u);
+      _initBlobVoice();
+    }
     if(window.speechSynthesis){
       speechSynthesis.addEventListener('voiceschanged',_initBlobVoice);
       _initBlobVoice();
+      document.addEventListener('touchstart',_unlockBlobSpeech,{once:true});
+      document.addEventListener('click',_unlockBlobSpeech,{once:true});
     }
     const _poiInside=new Map();
     function handlePoiBlobProx(lat,lng){
@@ -2726,9 +2734,21 @@ function _initPreferredVoice() {
     null;
 }
 
+// Mobile browsers block speechSynthesis.speak() unless primed by a user gesture.
+// Fire a silent utterance on first tap to unlock it for the session.
+function _unlockSpeech() {
+  if (!window.speechSynthesis) return;
+  const utt = new SpeechSynthesisUtterance('');
+  utt.volume = 0;
+  window.speechSynthesis.speak(utt);
+  _initPreferredVoice(); // voices may now be populated on iOS
+}
+
 if (window.speechSynthesis) {
   window.speechSynthesis.addEventListener('voiceschanged', _initPreferredVoice);
   _initPreferredVoice();
+  document.addEventListener('touchstart', _unlockSpeech, { once: true });
+  document.addEventListener('click',      _unlockSpeech, { once: true });
 }
 
 // ── Proximity / voice ─────────────────────────────────────────
