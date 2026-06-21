@@ -59,7 +59,7 @@
   </script>
 
   <!-- DriveTracker custom styles -->
-  <link rel="stylesheet" href="/styles.css?v=39" />
+  <link rel="stylesheet" href="/styles.css?v=40" />
 </head>
 
 <!-- overflow handled in styles.css via dvh; removed from class to not clip iOS safe-area -->
@@ -150,6 +150,12 @@
       </span>
       <span class="nav-menu-label">Garage</span>
       <span class="nav-menu-sub">Manage vehicles</span>
+    </button>
+    <div class="nav-menu-divider poi-menu-divider"></div>
+    <button id="menu-poi-btn" class="nav-menu-item poi-menu-item" role="menuitem">
+      <span class="nav-menu-icon">📍</span>
+      <span class="nav-menu-label">Points of Interest</span>
+      <span class="nav-menu-sub">Manage saved locations</span>
     </button>
     <div class="nav-menu-divider"></div>
     <button id="menu-signout-btn" class="nav-menu-item" role="menuitem">
@@ -428,6 +434,137 @@
   </div><!-- /settings-overlay -->
 
   <!-- ══════════════════════════════════════════════════
+       POI PANEL — right-side slide-in (desktop only management)
+       ══════════════════════════════════════════════════ -->
+  <div id="poi-overlay" class="poi-overlay" role="dialog" aria-modal="true" aria-label="Points of Interest">
+    <div id="poi-panel" class="poi-panel">
+
+      <!-- ── List view ─────────────────────────────────────────── -->
+      <div id="poi-list-view" class="poi-panel-view">
+        <div class="poi-panel-header">
+          <h2 class="poi-panel-title">Points of Interest</h2>
+          <div class="poi-panel-header-actions">
+            <button id="poi-settings-btn" class="poi-icon-btn" title="POI settings" aria-label="POI settings">⚙️</button>
+            <button id="poi-add-btn" class="settings-add-btn" aria-label="Add POI">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+              </svg>
+              Add POI
+            </button>
+            <button id="poi-close-btn" class="settings-close-btn" aria-label="Close">Close</button>
+          </div>
+        </div>
+
+        <!-- Settings row (collapsible) -->
+        <div id="poi-settings-row" class="poi-settings-row hidden">
+          <div class="poi-settings-field">
+            <label for="poi-radius-input">Approach radius</label>
+            <input type="number" id="poi-radius-input" min="50" max="5000" value="300" />
+            <span style="font-size:12px;color:var(--text-muted)">m</span>
+          </div>
+          <div class="poi-settings-field">
+            <input type="checkbox" id="poi-circle-toggle" />
+            <label for="poi-circle-toggle">Show radius on map</label>
+          </div>
+        </div>
+
+        <!-- POI list -->
+        <div id="poi-list" class="poi-list" role="list" aria-label="Points of Interest"></div>
+      </div><!-- /poi-list-view -->
+
+      <!-- ── Form view ──────────────────────────────────────────── -->
+      <div id="poi-form-view" class="poi-panel-view hidden">
+        <div class="poi-panel-header">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button id="poi-back-btn" class="settings-back-btn" aria-label="Back to list">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+              </svg>
+            </button>
+            <h2 id="poi-form-title" class="poi-panel-title">Add POI</h2>
+          </div>
+          <button id="poi-cancel-btn" class="settings-close-btn" aria-label="Cancel">Cancel</button>
+        </div>
+
+        <div class="poi-form-scroll">
+          <form id="poi-form" novalidate>
+
+            <!-- Identity section -->
+            <div class="settings-form-card">
+              <p class="settings-form-section-label">Identity</p>
+              <div class="settings-form-field">
+                <label for="poi-name-input" class="form-label">Official name <span style="color:#f97316">*</span></label>
+                <input type="text" id="poi-name-input" class="form-input"
+                       placeholder="e.g. Laguna Seca Raceway" autocomplete="off" required />
+                <p id="poi-name-error" class="poi-error" hidden>Name is required.</p>
+              </div>
+              <div class="settings-form-field">
+                <label for="poi-friendly-input" class="form-label">Friendly name</label>
+                <input type="text" id="poi-friendly-input" class="form-input"
+                       placeholder="e.g. The Track" autocomplete="off" />
+                <p class="settings-form-hint">Used for voice announcements if set</p>
+              </div>
+              <div class="settings-form-field" style="margin-bottom:0">
+                <label for="poi-category-select" class="form-label">Category</label>
+                <select id="poi-category-select" class="form-input">
+                  <option value="fuel_stop">⛽ Fuel Stop</option>
+                  <option value="track_circuit">🏁 Track / Circuit</option>
+                  <option value="viewpoint_scenic">🏔️ Viewpoint / Scenic</option>
+                  <option value="restaurant_cafe">🍽️ Restaurant / Café</option>
+                  <option value="parking">🅿️ Parking</option>
+                  <option value="home_base">🏠 Home / Base</option>
+                  <option value="garage_storage">🏗️ Garage / Storage</option>
+                  <option value="other" selected>📍 Other</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Location section -->
+            <div class="settings-form-card" style="margin-top:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0;">
+              <p class="settings-form-section-label">Location</p>
+              <div class="settings-form-field">
+                <label for="poi-address-input" class="form-label">Address</label>
+                <div style="display:flex;gap:8px;">
+                  <input type="text" id="poi-address-input" class="form-input"
+                         placeholder="Search or use map" style="flex:1;min-width:0" autocomplete="off" />
+                  <button type="button" id="poi-search-btn" class="settings-add-btn" style="flex-shrink:0;white-space:nowrap;">Search</button>
+                </div>
+                <div id="poi-address-results" class="poi-address-results" hidden></div>
+              </div>
+              <button type="button" id="poi-place-btn" class="poi-place-btn">📍 Click on the map to place</button>
+              <p id="poi-place-status" class="poi-place-status">No location set — search an address or click on the map</p>
+            </div>
+
+            <!-- Notes section -->
+            <div class="settings-form-card" style="margin-top:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0;">
+              <p class="settings-form-section-label">Notes</p>
+              <div class="settings-form-field" style="margin-bottom:0">
+                <label for="poi-notes-input" class="form-label">Notes</label>
+                <textarea id="poi-notes-input" class="form-input" rows="3"
+                          placeholder="Optional notes…" style="resize:vertical"></textarea>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="settings-form-footer">
+              <button type="submit" class="btn-primary settings-save-btn">Save POI</button>
+              <button type="button" id="poi-cancel-btn-2" class="btn-secondary settings-cancel-btn">Cancel</button>
+            </div>
+
+          </form>
+        </div><!-- /poi-form-scroll -->
+      </div><!-- /poi-form-view -->
+
+    </div><!-- /poi-panel -->
+  </div><!-- /poi-overlay -->
+
+  <!-- Place-mode banner — full-width orange strip, shown while user picks a spot on the map -->
+  <div id="poi-place-banner" class="poi-place-banner" hidden>
+    <span>Click anywhere on the map to place the POI</span>
+    <button id="poi-cancel-place-btn" type="button">Cancel</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
        ABOUT MODAL
        ══════════════════════════════════════════════════ -->
   <div id="about-overlay" class="about-overlay" role="dialog" aria-modal="true" aria-label="About DriveTracker">
@@ -538,7 +675,7 @@
        SCRIPTS
        ══════════════════════════════════════════════════ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/app.js?v=39"></script>
+  <script src="/app.js?v=40"></script>
 
   <!-- Firebase SDKs (compat build — no bundler needed) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>

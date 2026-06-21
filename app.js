@@ -16,7 +16,7 @@
 'use strict';
 
 // Current app version — update this with every release.
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.7.0';
 const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
@@ -513,6 +513,14 @@ function haversine(lat1, lon1, lat2, lon2) {
 
 const mpsToMph = mps => mps * 2.23694;
 
+const EARTH_RADIUS_METERS = 6371000;
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return EARTH_RADIUS_METERS * 2 * Math.asin(Math.sqrt(a));
+}
+
 function formatDuration(totalSeconds) {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
@@ -912,6 +920,7 @@ function onPositionUpdate(pos) {
   lastGPSTimestamp = now;
 
   appendToRoute(latlng);
+  handlePoiProximity(lat, lng);
   sessionState.coordinates.push({ lat, lng, alt: altitude, speed, ts: now });
   lastRecordedTs = now;
 
@@ -999,6 +1008,7 @@ async function startDrive() {
     els.duration.textContent = formatDuration(getElapsedSeconds());
   }, 1000);
 
+  poiAnnounceLog.clear();
   setCTAState('recording');
   setStatus('Drive started. Acquiring GPS signal…');
   document.getElementById('vehicle-select').disabled = true;
@@ -1469,6 +1479,7 @@ async function openDriveMap(drive) {
   const vehicles     = await getAllVehicles();
   const vehicleRec   = vehicles.find(v => v.name === drive.vehicle);
   const vehiclePhoto = vehicleRec?.photo || null;
+  const poiSnapshot  = [...loadedPOIs];
 
   // Build static direction arrows: one every 8 coords.
   const arrowData = [];
@@ -1552,6 +1563,10 @@ async function openDriveMap(drive) {
     .rp-label { display: none; }
     @media (min-width: 480px) { .rp-label { display: inline; } }
     .rp-divider { width: 1px; height: 26px; background: rgba(255,255,255,0.12); margin: 0 2px; flex-shrink: 0; }
+    .rp-announce { display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 0 8px; min-height: 44px; font-size: 12px; font-weight: 600; color: #94a3b8; user-select: none; }
+    .rp-announce input[type="checkbox"] { width: 14px; height: 14px; accent-color: #f97316; cursor: pointer; }
+    .rp-announce span { display: none; }
+    @media (min-width: 480px) { .rp-announce span { display: inline; } }
 
     /* DNA pill */
     #dna {
@@ -1618,6 +1633,11 @@ async function openDriveMap(drive) {
     </button>
     <div class="rp-divider"></div>
     <button class="rp-btn" id="rp-speed" title="Playback speed">1×</button>
+    <div class="rp-divider"></div>
+    <label class="rp-announce" title="Announce POIs during replay">
+      <input type="checkbox" id="rp-announce" checked />
+      <span>📍 POIs</span>
+    </label>
   </div>
 
   <div id="dna" class="glass-pill">${buildDnaHTML(score)}</div>
@@ -1625,11 +1645,13 @@ async function openDriveMap(drive) {
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const coords       = ${JSON.stringify(coords)};
-    const arrowData    = ${JSON.stringify(arrowData)};
-    const replayCoords = ${JSON.stringify(replayCoords)};
-    const vehiclePhoto = ${JSON.stringify(vehiclePhoto)};
-    const SPEEDS       = [1, 2, 4, 8, 16, 32];
+    const coords        = ${JSON.stringify(coords)};
+    const arrowData     = ${JSON.stringify(arrowData)};
+    const replayCoords  = ${JSON.stringify(replayCoords)};
+    const vehiclePhoto  = ${JSON.stringify(vehiclePhoto)};
+    const poiData       = ${JSON.stringify(poiSnapshot)};
+    const poiSettingsData = ${JSON.stringify(poiSettings)};
+    const SPEEDS        = [1, 2, 4, 8, 16, 32];
 
     // ── Map ──────────────────────────────────────────────────────
     const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
@@ -1668,6 +1690,52 @@ async function openDriveMap(drive) {
     } else {
       map.setView([37.7749, -122.4194], 13);
     }
+
+    // ── POI markers ───────────────────────────────────────────────
+    const _PC={'fuel_stop':'#ef4444','track_circuit':'#7c3aed','viewpoint_scenic':'#06b6d4','restaurant_cafe':'#f59e0b','parking':'#3b82f6','home_base':'#22c55e','garage_storage':'#64748b','other':'#f97316'};
+    const _PI={'fuel_stop':'⛽','track_circuit':'🏁','viewpoint_scenic':'🏔️','restaurant_cafe':'🍽️','parking':'🅿️','home_base':'🏠','garage_storage':'🏗️','other':'📍'};
+    function _esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    poiData.forEach(poi=>{
+      const clr=_PC[poi.category]||'#f97316', ico=_PI[poi.category]||'📍';
+      L.marker([poi.lat,poi.lng],{
+        icon:L.divIcon({className:'',html:'<div style="width:32px;height:32px;border-radius:8px;background:'+clr+';display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,.3);border:2px solid rgba(255,255,255,.9)">'+ico+'</div>',iconSize:[32,32],iconAnchor:[16,16]}),
+        zIndexOffset:500,interactive:false
+      }).bindTooltip(_esc(poi.friendlyName||poi.name),{direction:'top'}).addTo(map);
+      if(poiSettingsData.showRadiusCircle)
+        L.circle([poi.lat,poi.lng],{radius:poiSettingsData.approachRadiusM,color:clr,weight:1,fillOpacity:0.08,interactive:false}).addTo(map);
+    });
+
+    // ── POI proximity announcements ────────────────────────────────
+    // Entry-detection: announce only on outside→inside transition.
+    // undefined = initial state (no announcement); true/false = inside/outside.
+    let _blobVoice=null;
+    function _initBlobVoice(){
+      const vv=speechSynthesis.getVoices();
+      if(!vv.length)return;
+      _blobVoice=vv.find(v=>v.name==='Google US English')||vv.find(v=>v.lang==='en-US')||null;
+    }
+    if(window.speechSynthesis){
+      speechSynthesis.addEventListener('voiceschanged',_initBlobVoice);
+      _initBlobVoice();
+    }
+    const _poiInside=new Map();
+    function handlePoiBlobProx(lat,lng){
+      if(!poiData.length||!window.speechSynthesis)return;
+      const r=poiSettingsData.approachRadiusM, toR=d=>d*Math.PI/180;
+      poiData.forEach(poi=>{
+        const dLa=toR(poi.lat-lat),dLo=toR(poi.lng-lng);
+        const a=Math.sin(dLa/2)**2+Math.cos(toR(lat))*Math.cos(toR(poi.lat))*Math.sin(dLo/2)**2;
+        const inside=6371000*2*Math.asin(Math.sqrt(a))<=r;
+        const was=_poiInside.get(poi.id);
+        _poiInside.set(poi.id,inside);
+        if(inside&&was===false){
+          const utt=new SpeechSynthesisUtterance('Approaching '+(poi.friendlyName||poi.name));
+          if(_blobVoice)utt.voice=_blobVoice;
+          speechSynthesis.speak(utt);
+        }
+      });
+    }
+    document.getElementById('rp-announce')?.addEventListener('change',e=>{if(!e.target.checked)_poiInside.clear();});
 
     // ── Replay engine ─────────────────────────────────────────────
     const rc         = replayCoords;
@@ -1771,6 +1839,7 @@ async function openDriveMap(drive) {
         const pt = interpolate(elapsed);
         lastBearing = pt.bearing;
         replayMarker.setLatLng([pt.lat, pt.lng]);
+        if(state==='playing'&&document.getElementById('rp-announce')?.checked)handlePoiBlobProx(pt.lat,pt.lng);
         updateBearing(pt.bearing);
         document.getElementById('hud-time').textContent  = fmtTime(startTs + elapsed);
         document.getElementById('hud-speed').textContent = pt.speed != null
@@ -2607,6 +2676,436 @@ async function resumeFromDraft(draft) {
   setStatus('Drive recovered. Tap Resume to continue.');
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 10. POI Management
+// ═══════════════════════════════════════════════════════════════
+
+// ── In-memory state ───────────────────────────────────────────
+let loadedPOIs     = [];
+let poiSettings    = { approachRadiusM: 300, showRadiusCircle: false };
+let poiMarkers     = [];
+let poiCircles     = [];
+let poiUnsub       = null;
+let poiAnnounceLog = new Map();  // poiId → last announced timestamp (session only)
+let poiPanelOpen   = false;
+let placingPOI     = false;
+let pendingLat     = null;
+let pendingLng     = null;
+let editingPoiId   = null;
+
+// ── Category config ───────────────────────────────────────────
+const POI_CATEGORIES = {
+  fuel_stop:        { label: 'Fuel Stop',          icon: '⛽', color: '#ef4444' },
+  track_circuit:    { label: 'Track / Circuit',    icon: '🏁', color: '#7c3aed' },
+  viewpoint_scenic: { label: 'Viewpoint / Scenic', icon: '🏔️', color: '#06b6d4' },
+  restaurant_cafe:  { label: 'Restaurant / Café',  icon: '🍽️', color: '#f59e0b' },
+  parking:          { label: 'Parking',             icon: '🅿️', color: '#3b82f6' },
+  home_base:        { label: 'Home / Base',         icon: '🏠', color: '#22c55e' },
+  garage_storage:   { label: 'Garage / Storage',   icon: '🏗️', color: '#64748b' },
+  other:            { label: 'Other',               icon: '📍', color: '#f97316' },
+};
+
+// ── Firestore refs ────────────────────────────────────────────
+function _poisCol() {
+  return firebase.firestore().collection('users').doc(currentUserId).collection('pois');
+}
+function _settingsDoc() {
+  return firebase.firestore().collection('users').doc(currentUserId).collection('settings').doc('app');
+}
+
+// ── Voice selection ───────────────────────────────────────────
+let _preferredVoice = null;
+
+function _initPreferredVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return;
+  _preferredVoice =
+    voices.find(v => v.name === 'Google US English') ||
+    voices.find(v => v.lang === 'en-US' && !v.localService === false) ||
+    voices.find(v => v.lang === 'en-US') ||
+    null;
+}
+
+if (window.speechSynthesis) {
+  window.speechSynthesis.addEventListener('voiceschanged', _initPreferredVoice);
+  _initPreferredVoice();
+}
+
+// ── Proximity / voice ─────────────────────────────────────────
+function handlePoiProximity(lat, lng) {
+  if (!loadedPOIs.length || !window.speechSynthesis) return;
+  const radiusM = poiSettings.approachRadiusM;
+  for (const poi of loadedPOIs) {
+    const inside = haversineMeters(lat, lng, poi.lat, poi.lng) <= radiusM;
+    const was    = poiAnnounceLog.get(poi.id);
+    poiAnnounceLog.set(poi.id, inside);
+    if (inside && was === false) {
+      const utt = new SpeechSynthesisUtterance(`Approaching ${poi.friendlyName || poi.name}`);
+      if (_preferredVoice) utt.voice = _preferredVoice;
+      window.speechSynthesis.speak(utt);
+    }
+  }
+}
+
+// ── Map markers ───────────────────────────────────────────────
+function renderPoiMarkersOnMap() {
+  if (!map) return;
+  clearPoiMarkersOnMap();
+  for (const poi of loadedPOIs) {
+    const cat    = POI_CATEGORIES[poi.category] || POI_CATEGORIES.other;
+    const marker = L.marker([poi.lat, poi.lng], {
+      icon: L.divIcon({
+        className: '',
+        html: `<div class="poi-marker" style="background:${cat.color}">${cat.icon}</div>`,
+        iconSize: [32, 32], iconAnchor: [16, 16],
+      }),
+      zIndexOffset: 500,
+    }).addTo(map);
+    marker.bindTooltip(poi.friendlyName || poi.name, { direction: 'top' });
+    poiMarkers.push(marker);
+    if (poiSettings.showRadiusCircle) {
+      const circle = L.circle([poi.lat, poi.lng], {
+        radius: poiSettings.approachRadiusM,
+        color: cat.color,
+        weight: 1,
+        fillOpacity: 0.08,
+        interactive: false,
+      }).addTo(map);
+      poiCircles.push(circle);
+    }
+  }
+}
+
+function clearPoiMarkersOnMap() {
+  poiMarkers.forEach(m => m.remove());
+  poiCircles.forEach(c => c.remove());
+  poiMarkers = [];
+  poiCircles = [];
+}
+
+// ── Firestore listener ────────────────────────────────────────
+function startPoiListener() {
+  if (!currentUserId) return;
+  poiUnsub?.();
+  poiUnsub = _poisCol().onSnapshot(snap => {
+    loadedPOIs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderPoiMarkersOnMap();
+    if (poiPanelOpen) renderPoiList();
+  }, err => console.warn('[POI] Listener error:', err.message));
+}
+
+window.stopPoiListener = function stopPoiListener() {
+  poiUnsub?.();
+  poiUnsub = null;
+};
+
+// ── POI settings ─────────────────────────────────────────────
+async function loadPoiSettings() {
+  try {
+    const doc = await _settingsDoc().get();
+    if (doc.exists && doc.data().poi) Object.assign(poiSettings, doc.data().poi);
+  } catch (e) { /* use defaults */ }
+}
+
+let _settingsDebounce = null;
+function savePoiSettingsDebounced() {
+  clearTimeout(_settingsDebounce);
+  _settingsDebounce = setTimeout(async () => {
+    try { await _settingsDoc().set({ poi: poiSettings }, { merge: true }); }
+    catch (e) { console.warn('[POI] Settings save failed:', e.message); }
+  }, 800);
+}
+
+// ── POI CRUD ─────────────────────────────────────────────────
+async function _addPOI(data) {
+  await _poisCol().add({ ...data, createdAt: Date.now(), updatedAt: Date.now() });
+}
+
+async function _updatePOI(poiId, data) {
+  await _poisCol().doc(poiId).set({ ...data, updatedAt: Date.now() }, { merge: true });
+}
+
+async function _deletePOI(poiId) {
+  await _poisCol().doc(poiId).delete();
+}
+
+// ── Panel open/close ─────────────────────────────────────────
+const poiOverlay    = document.getElementById('poi-overlay');
+const poiListViewEl = document.getElementById('poi-list-view');
+const poiFormViewEl = document.getElementById('poi-form-view');
+const poiListEl     = document.getElementById('poi-list');
+
+function openPoiPanel() {
+  if (!poiOverlay) return;
+  poiPanelOpen = true;
+  poiOverlay.classList.add('open');
+  _showPoiList();
+  renderPoiList();
+  document.getElementById('poi-radius-input').value     = poiSettings.approachRadiusM;
+  document.getElementById('poi-circle-toggle').checked  = poiSettings.showRadiusCircle;
+}
+
+function closePoiPanel() {
+  poiOverlay?.classList.remove('open');
+  poiPanelOpen = false;
+  _exitPlaceMode();
+}
+
+function _showPoiList() {
+  poiListViewEl?.classList.remove('hidden');
+  poiFormViewEl?.classList.add('hidden');
+  editingPoiId = null;
+}
+
+function _showPoiForm(poi = null) {
+  poiListViewEl?.classList.add('hidden');
+  poiFormViewEl?.classList.remove('hidden');
+  editingPoiId = poi?.id ?? null;
+  document.getElementById('poi-form-title').textContent        = poi ? 'Edit POI' : 'Add POI';
+  document.getElementById('poi-name-input').value              = poi?.name ?? '';
+  document.getElementById('poi-friendly-input').value          = poi?.friendlyName ?? '';
+  document.getElementById('poi-address-input').value           = poi?.address ?? '';
+  document.getElementById('poi-category-select').value         = poi?.category ?? 'other';
+  document.getElementById('poi-notes-input').value             = poi?.notes ?? '';
+  document.getElementById('poi-address-results').setAttribute('hidden', '');
+  pendingLat = poi?.lat ?? null;
+  pendingLng = poi?.lng ?? null;
+  _updatePlaceStatus();
+}
+
+function _updatePlaceStatus() {
+  const el = document.getElementById('poi-place-status');
+  if (!el) return;
+  if (pendingLat !== null) {
+    el.textContent = `📍 ${pendingLat.toFixed(5)}, ${pendingLng.toFixed(5)}`;
+    el.className = 'poi-place-status placed';
+  } else {
+    el.textContent = 'No location set — search an address or click on the map';
+    el.className = 'poi-place-status';
+  }
+}
+
+// ── List rendering ────────────────────────────────────────────
+function renderPoiList() {
+  if (!poiListEl) return;
+  if (!loadedPOIs.length) {
+    poiListEl.innerHTML = '<p class="poi-empty">No POIs yet. Click + Add POI to create your first.</p>';
+    return;
+  }
+  const sorted = [...loadedPOIs].sort((a, b) => a.name.localeCompare(b.name));
+  poiListEl.innerHTML = '';
+  for (const poi of sorted) {
+    const cat = POI_CATEGORIES[poi.category] || POI_CATEGORIES.other;
+    const row = document.createElement('div');
+    row.className = 'poi-card';
+    row.setAttribute('role', 'listitem');
+    row.innerHTML = `
+      <button class="poi-card-icon-btn" data-id="${poi.id}" title="Pan map to ${escapeHTML(poi.name)}">
+        <div class="poi-card-icon" style="background:${cat.color}">${cat.icon}</div>
+      </button>
+      <div class="poi-card-content">
+        <div class="poi-card-name">${escapeHTML(poi.name)}</div>
+        ${poi.friendlyName ? `<div class="poi-card-friendly">"${escapeHTML(poi.friendlyName)}"</div>` : ''}
+        <div class="poi-card-sub">${escapeHTML(cat.label)}${poi.address ? ' · ' + escapeHTML(poi.address.split(',')[0]) : ''}</div>
+      </div>
+      <div class="poi-card-actions">
+        <button class="poi-edit-btn" data-id="${poi.id}" aria-label="Edit ${escapeHTML(poi.name)}">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button class="poi-delete-btn" data-id="${poi.id}" aria-label="Delete ${escapeHTML(poi.name)}">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        </button>
+      </div>`;
+    poiListEl.appendChild(row);
+  }
+
+  poiListEl.querySelectorAll('.poi-card-icon-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const poi = loadedPOIs.find(p => p.id === btn.dataset.id);
+      if (poi) { map?.setView([poi.lat, poi.lng], 16); closePoiPanel(); }
+    });
+  });
+  poiListEl.querySelectorAll('.poi-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const poi = loadedPOIs.find(p => p.id === btn.dataset.id);
+      if (poi) _showPoiForm(poi);
+    });
+  });
+  poiListEl.querySelectorAll('.poi-delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => _confirmDeletePOI(btn));
+  });
+}
+
+function _confirmDeletePOI(btn) {
+  const poi = loadedPOIs.find(p => p.id === btn.dataset.id);
+  if (!poi) return;
+  const card = btn.closest('.poi-card');
+  if (card.querySelector('.poi-delete-confirm')) return;
+  const conf = document.createElement('div');
+  conf.className = 'poi-delete-confirm';
+  conf.innerHTML = `<span>Delete "${escapeHTML(poi.name)}"?</span>
+    <button class="poi-confirm-yes">Delete</button>
+    <button class="poi-confirm-no">Cancel</button>`;
+  card.appendChild(conf);
+  conf.querySelector('.poi-confirm-yes').addEventListener('click', () => _deletePOI(poi.id));
+  conf.querySelector('.poi-confirm-no').addEventListener('click', () => conf.remove());
+}
+
+// ── Map click-to-place ────────────────────────────────────────
+function _enterPlaceMode() {
+  if (placingPOI) return;
+  placingPOI = true;
+  poiOverlay?.classList.remove('open');
+  document.getElementById('poi-place-banner')?.removeAttribute('hidden');
+  map?.getContainer() && (map.getContainer().style.cursor = 'crosshair');
+  map?.once('click', _onMapPlaceClick);
+}
+
+function _exitPlaceMode() {
+  if (!placingPOI) return;
+  placingPOI = false;
+  document.getElementById('poi-place-banner')?.setAttribute('hidden', '');
+  if (map?.getContainer()) map.getContainer().style.cursor = '';
+  map?.off('click', _onMapPlaceClick);
+}
+
+async function _onMapPlaceClick(e) {
+  placingPOI = false;
+  document.getElementById('poi-place-banner')?.setAttribute('hidden', '');
+  if (map?.getContainer()) map.getContainer().style.cursor = '';
+  pendingLat = e.latlng.lat;
+  pendingLng = e.latlng.lng;
+  poiOverlay?.classList.add('open');
+  _updatePlaceStatus();
+  try {
+    const url  = `https://nominatim.openstreetmap.org/reverse?lat=${pendingLat}&lon=${pendingLng}&format=json`;
+    const data = await fetch(url).then(r => r.json());
+    if (data.display_name) document.getElementById('poi-address-input').value = data.display_name;
+  } catch (e) { /* silent — address field stays blank */ }
+}
+
+// ── Address search ────────────────────────────────────────────
+async function _searchAddress() {
+  const q = (document.getElementById('poi-address-input')?.value || '').trim();
+  if (!q) return;
+  const resultsEl = document.getElementById('poi-address-results');
+  if (!resultsEl) return;
+  resultsEl.innerHTML = '<div class="poi-geocode-loading">Searching…</div>';
+  resultsEl.removeAttribute('hidden');
+  try {
+    const url  = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`;
+    const data = await fetch(url).then(r => r.json());
+    if (!data.length) { resultsEl.innerHTML = '<div class="poi-geocode-loading">No results found.</div>'; return; }
+    resultsEl.innerHTML = '';
+    data.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type      = 'button';
+      btn.className = 'poi-geocode-result';
+      btn.textContent = item.display_name;
+      btn.addEventListener('click', () => {
+        pendingLat = parseFloat(item.lat);
+        pendingLng = parseFloat(item.lon);
+        document.getElementById('poi-address-input').value = item.display_name;
+        resultsEl.setAttribute('hidden', '');
+        resultsEl.innerHTML = '';
+        _updatePlaceStatus();
+        map?.setView([pendingLat, pendingLng], 15);
+      });
+      resultsEl.appendChild(btn);
+    });
+  } catch (e) {
+    resultsEl.innerHTML = '<div class="poi-geocode-loading">Search failed. Check your connection.</div>';
+  }
+}
+
+// ── Form submit ───────────────────────────────────────────────
+document.getElementById('poi-form')?.addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = (document.getElementById('poi-name-input')?.value || '').trim();
+  const nameErr = document.getElementById('poi-name-error');
+  if (!name) { nameErr?.removeAttribute('hidden'); return; }
+  nameErr?.setAttribute('hidden', '');
+  if (pendingLat === null) {
+    setStatus('Please set a POI location by clicking the map or searching an address.');
+    return;
+  }
+  const data = {
+    name,
+    friendlyName: (document.getElementById('poi-friendly-input')?.value || '').trim(),
+    address:      (document.getElementById('poi-address-input')?.value  || '').trim(),
+    lat:          pendingLat,
+    lng:          pendingLng,
+    category:     document.getElementById('poi-category-select')?.value || 'other',
+    notes:        (document.getElementById('poi-notes-input')?.value || '').trim(),
+  };
+  try {
+    if (editingPoiId) { await _updatePOI(editingPoiId, data); }
+    else              { await _addPOI(data); }
+    _showPoiList();
+  } catch (err) {
+    setStatus(`POI save failed: ${err.message}`);
+  }
+});
+
+// ── Settings panel ────────────────────────────────────────────
+document.getElementById('poi-settings-btn')?.addEventListener('click', () => {
+  document.getElementById('poi-settings-row')?.classList.toggle('hidden');
+});
+
+document.getElementById('poi-radius-input')?.addEventListener('input', () => {
+  const v = parseInt(document.getElementById('poi-radius-input').value);
+  if (v >= 50) { poiSettings.approachRadiusM = v; renderPoiMarkersOnMap(); savePoiSettingsDebounced(); }
+});
+
+document.getElementById('poi-circle-toggle')?.addEventListener('change', e => {
+  poiSettings.showRadiusCircle = e.target.checked;
+  renderPoiMarkersOnMap();
+  savePoiSettingsDebounced();
+});
+
+// ── Button wiring ─────────────────────────────────────────────
+document.getElementById('menu-poi-btn')?.addEventListener('click', () => {
+  closeMenu();
+  openPoiPanel();
+});
+
+document.getElementById('poi-close-btn')?.addEventListener('click', closePoiPanel);
+
+document.getElementById('poi-add-btn')?.addEventListener('click', () => {
+  pendingLat = null;
+  pendingLng = null;
+  _showPoiForm();
+});
+
+document.getElementById('poi-back-btn')?.addEventListener('click', () => {
+  _exitPlaceMode();
+  _showPoiList();
+});
+
+document.getElementById('poi-cancel-btn')?.addEventListener('click', () => {
+  _exitPlaceMode();
+  _showPoiList();
+});
+
+document.getElementById('poi-cancel-btn-2')?.addEventListener('click', () => {
+  _exitPlaceMode();
+  _showPoiList();
+});
+
+document.getElementById('poi-place-btn')?.addEventListener('click', _enterPlaceMode);
+
+document.getElementById('poi-cancel-place-btn')?.addEventListener('click', () => {
+  _exitPlaceMode();
+  poiOverlay?.classList.add('open');
+});
+
+document.getElementById('poi-search-btn')?.addEventListener('click', _searchAddress);
+
+document.getElementById('poi-address-input')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); _searchAddress(); }
+});
+
+// ─────────────────────────────────────────────────────────────
 // initApp is called by auth.js once Google sign-in is verified.
 window.addEventListener('DOMContentLoaded', () => {
   registerSW();
@@ -2642,6 +3141,8 @@ window.initApp = async function initApp(user) {
 
   await populateVehicleDropdown();
   initMap();
+  await loadPoiSettings();
+  startPoiListener();
   setCTAState('start');
   previewLocation();
   handleDeepLink();
