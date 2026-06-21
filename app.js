@@ -16,7 +16,7 @@
 'use strict';
 
 // Current app version — update this with every release.
-const APP_VERSION = '1.7.5';
+const APP_VERSION = '1.7.6';
 const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
@@ -2727,9 +2727,12 @@ let _preferredVoice = null;
 function _initPreferredVoice() {
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return;
-  // Only override the system default on Chrome where Google US English is
-  // meaningfully better. On Safari/iOS the user configures their preferred
-  // TTS voice in system settings — don't stomp it.
+  const stored = localStorage.getItem('dt_preferred_voice');
+  if (stored) {
+    _preferredVoice = voices.find(v => v.name === stored) || null;
+    return;
+  }
+  // No user preference stored — default to Google US English on Chrome.
   _preferredVoice = voices.find(v => v.name === 'Google US English') || null;
 }
 
@@ -2744,11 +2747,85 @@ function _unlockSpeech() {
 }
 
 if (window.speechSynthesis) {
-  window.speechSynthesis.addEventListener('voiceschanged', _initPreferredVoice);
+  window.speechSynthesis.addEventListener('voiceschanged', () => {
+    _initPreferredVoice();
+    _populateVoiceSelect(); // refresh dropdown if modal is open
+  });
   _initPreferredVoice();
   document.addEventListener('touchstart', _unlockSpeech, { once: true });
   document.addEventListener('click',      _unlockSpeech, { once: true });
 }
+
+// ── Voice picker modal ────────────────────────────────────────
+function _populateVoiceSelect() {
+  const sel = document.getElementById('voice-select');
+  if (!sel) return;
+  const voices = window.speechSynthesis?.getVoices() || [];
+  const stored = localStorage.getItem('dt_preferred_voice');
+  sel.innerHTML = '';
+  if (!voices.length) {
+    const opt = document.createElement('option');
+    opt.textContent = 'Loading voices — tap Preview to load…';
+    opt.disabled = true;
+    sel.appendChild(opt);
+    return;
+  }
+  voices.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = `${v.name} (${v.lang})`;
+    if (v.name === stored) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  // If nothing stored, pre-select Google US English if available.
+  if (!stored) {
+    const goog = [...sel.options].find(o => o.value === 'Google US English');
+    if (goog) goog.selected = true;
+  }
+}
+
+function openVoicePanel() {
+  _populateVoiceSelect();
+  document.getElementById('voice-overlay').classList.add('open');
+}
+
+function closeVoicePanel() {
+  document.getElementById('voice-overlay').classList.remove('open');
+}
+
+document.getElementById('menu-voice-btn')?.addEventListener('click', () => {
+  closeMenu();
+  openVoicePanel();
+});
+
+document.getElementById('voice-close')?.addEventListener('click', closeVoicePanel);
+
+document.getElementById('voice-overlay')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('voice-overlay')) closeVoicePanel();
+});
+
+document.getElementById('voice-select')?.addEventListener('change', e => {
+  const name = e.target.value;
+  localStorage.setItem('dt_preferred_voice', name);
+  const voices = window.speechSynthesis?.getVoices() || [];
+  _preferredVoice = voices.find(v => v.name === name) || null;
+});
+
+document.getElementById('voice-preview-btn')?.addEventListener('click', () => {
+  if (!window.speechSynthesis) return;
+  const name   = document.getElementById('voice-select')?.value;
+  const text   = document.getElementById('voice-preview-text')?.value || 'Approaching Red Rock Canyon';
+  const voices = window.speechSynthesis.getVoices();
+  // If voices just loaded for the first time (iOS), re-populate the dropdown.
+  if (voices.length && document.getElementById('voice-select')?.options.length <= 1) {
+    _populateVoiceSelect();
+  }
+  const voice = voices.find(v => v.name === name) || null;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  if (voice) utt.voice = voice;
+  window.speechSynthesis.speak(utt);
+});
 
 // ── Proximity / voice ─────────────────────────────────────────
 function handlePoiProximity(lat, lng) {

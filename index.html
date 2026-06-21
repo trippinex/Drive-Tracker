@@ -59,7 +59,7 @@
   </script>
 
   <!-- DriveTracker custom styles -->
-  <link rel="stylesheet" href="/styles.css?v=40" />
+  <link rel="stylesheet" href="/styles.css?v=41" />
 </head>
 
 <!-- overflow handled in styles.css via dvh; removed from class to not clip iOS safe-area -->
@@ -156,6 +156,12 @@
       <span class="nav-menu-icon">📍</span>
       <span class="nav-menu-label">Points of Interest</span>
       <span class="nav-menu-sub">Manage saved locations</span>
+    </button>
+    <div class="nav-menu-divider"></div>
+    <button id="menu-voice-btn" class="nav-menu-item" role="menuitem">
+      <span class="nav-menu-icon">🔊</span>
+      <span class="nav-menu-label">Voice</span>
+      <span class="nav-menu-sub">Announcement voice</span>
     </button>
     <div class="nav-menu-divider"></div>
     <button id="menu-signout-btn" class="nav-menu-item" role="menuitem">
@@ -598,6 +604,24 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════
+       VOICE PICKER MODAL
+       ══════════════════════════════════════════════════ -->
+  <div id="voice-overlay" class="about-overlay" role="dialog" aria-modal="true" aria-label="Announcement Voice">
+    <div class="about-panel voice-panel">
+      <button id="voice-close" class="about-close-btn" aria-label="Close">✕</button>
+      <div class="voice-panel-title">🔊 Announcement Voice</div>
+      <p class="voice-panel-desc">Choose the voice used for POI proximity announcements on this device.</p>
+      <div class="about-divider"></div>
+      <select id="voice-select" class="voice-select" aria-label="Select voice"></select>
+      <div class="voice-preview-row">
+        <input id="voice-preview-text" type="text" class="voice-preview-input" value="Approaching Red Rock Canyon" aria-label="Preview phrase" />
+        <button id="voice-preview-btn" class="voice-preview-btn">▶ Preview</button>
+      </div>
+      <p class="voice-panel-hint">Saved automatically. Each device remembers its own voice.</p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
        DRIVE SUMMARY MODAL — shown after stopping a drive
        ══════════════════════════════════════════════════ -->
   <div id="drive-summary-overlay" class="drive-summary-overlay" role="dialog" aria-modal="true" aria-label="Drive score" hidden>
@@ -675,7 +699,7 @@
        SCRIPTS
        ══════════════════════════════════════════════════ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/app.js?v=46"></script>
+  <script src="/app.js?v=47"></script>
 
   <!-- Firebase SDKs (compat build — no bundler needed) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>

@@ -25,6 +25,7 @@ Update this file when a feature moves from one stage to the next.
 | v1.7.3 | About modal version display fix — APP_VERSION was not bumped through patch releases |
 | v1.7.4 | Safari voice selection fix — prefer Enhanced voices; fix precedence bug in voice selection logic |
 | v1.7.5 | Safari voice respects iOS system TTS preference — no longer overrides user-selected voice (e.g. Ava Enhanced) |
+| v1.7.6 | Voice picker — hamburger menu item to select and preview announcement voice per device, saved to localStorage |
 
 ---
 

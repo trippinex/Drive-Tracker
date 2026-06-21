@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.6] - 2026-06-21
+
+### Added
+
+- **Voice picker** — new "🔊 Voice" item in the hamburger menu (all browsers, all devices). Opens a modal with a dropdown of all voices available on the current device, a customisable preview phrase (defaulting to "Approaching Red Rock Canyon"), and a Preview button to audition any voice before committing. Selection is saved to `localStorage` so each device remembers its own preference independently. Works on iOS Safari, Chrome, and any other browser with Web Speech API support.
+
+---
+
 ## [1.7.5] - 2026-06-21
 
 ### Fixed
