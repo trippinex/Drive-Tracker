@@ -1565,6 +1565,14 @@ async function openDriveMap(drive) {
       box-shadow: 0 4px 20px rgba(0,0,0,0.4);
       -webkit-tap-highlight-color: transparent;
     }
+    /* Invisible right-side counterweight — mirrors the back button width so
+       the info pill at left:50% lands in the visual centre of the free space. */
+    #nav-spacer {
+      position: fixed; top: 14px; right: 14px; z-index: 1001;
+      visibility: hidden; pointer-events: none;
+      display: flex; align-items: center; gap: 6px;
+      padding: 10px 14px; font-size: 14px; font-weight: 600;
+    }
 
     /* Route direction arrows */
     .route-arrow { display: flex; align-items: center; justify-content: center; }
@@ -1578,7 +1586,11 @@ async function openDriveMap(drive) {
   ${isStandalone ? `<button id="back-btn" onclick="history.back()">
     <svg width="8" height="13" viewBox="0 0 8 13" fill="currentColor"><polygon points="8,0 1,6.5 8,13"/></svg>
     Back
-  </button>` : ''}
+  </button>
+  <div id="nav-spacer" aria-hidden="true">
+    <svg width="8" height="13" viewBox="0 0 8 13"></svg>
+    Back
+  </div>` : ''}
   <div id="info" class="glass-pill">
     <strong>${escapeHTML(drive.vehicle || 'Drive')}</strong>
     <span>${new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
