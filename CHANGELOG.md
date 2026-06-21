@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.3] - 2026-06-21
+
+### Fixed
+
+- **About modal showing wrong version** — `APP_VERSION` was not bumped through the v1.7.1 and v1.7.2 patch releases. Updated to `1.7.2` (current release).
+
+---
+
 ## [1.7.2] - 2026-06-21
 
 ### Fixed
