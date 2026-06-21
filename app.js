@@ -16,7 +16,7 @@
 'use strict';
 
 // Current app version — update this with every release.
-const APP_VERSION = '1.7.6';
+const APP_VERSION = '1.7.7';
 const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
