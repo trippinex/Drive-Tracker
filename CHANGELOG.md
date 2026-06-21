@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.2] - 2026-06-21
+
+### Fixed
+
+- **POI markers missing on mobile browsers** (BUG-003) — Main-map POI markers used a CSS class (`poi-marker`) that can silently fail to apply on mobile if the stylesheet hasn't been processed at render time. Switched to inline styles, consistent with the replay blob markers which already used this approach.
+
+---
+
 ## [1.7.1] - 2026-06-21
 
 ### Fixed

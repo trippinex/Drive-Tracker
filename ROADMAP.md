@@ -30,6 +30,7 @@ Update this file when a feature moves from one stage to the next.
 | ID | Bug | Notes |
 |---|---|---|
 | BUG-002 | ~~POI voice announcements silent on mobile (iOS Safari + Chrome)~~ | Fixed in v1.7.1 — silent unlock utterance on first touch/click. |
+| BUG-003 | ~~POI markers missing on mobile browsers~~ | Fixed in v1.7.2 — switched to inline styles; CSS class-based divIcon markers can silently fail on mobile. |
 
 ---
 
