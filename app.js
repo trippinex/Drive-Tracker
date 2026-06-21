@@ -1475,6 +1475,9 @@ async function openDriveMap(drive) {
     arrowData.push({ lat: c[0], lng: c[1], bearing });
   }
 
+  const isStandalone = window.navigator.standalone === true ||
+                       window.matchMedia('(display-mode: standalone)').matches;
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1547,6 +1550,18 @@ async function openDriveMap(drive) {
     .dna-grade { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 2px; }
     .dna-item  { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 
+    /* Back button (standalone / PWA mode only) */
+    #back-btn {
+      position: fixed; top: 14px; left: 14px; z-index: 1001;
+      display: flex; align-items: center; gap: 6px;
+      padding: 10px 14px; border: none; border-radius: 10px; cursor: pointer;
+      background: rgba(15,23,42,0.92); color: #f1f5f9;
+      font-size: 14px; font-weight: 600; font-family: system-ui, sans-serif;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      -webkit-tap-highlight-color: transparent;
+    }
+
     /* Route direction arrows */
     .route-arrow { display: flex; align-items: center; justify-content: center; }
 
@@ -1556,6 +1571,10 @@ async function openDriveMap(drive) {
   </style>
 </head>
 <body>
+  ${isStandalone ? `<button id="back-btn" onclick="history.back()">
+    <svg width="8" height="13" viewBox="0 0 8 13" fill="currentColor"><polygon points="8,0 1,6.5 8,13"/></svg>
+    Back
+  </button>` : ''}
   <div id="info" class="glass-pill">
     <strong>${escapeHTML(drive.vehicle || 'Drive')}</strong>
     <span>${new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
@@ -1858,8 +1877,12 @@ async function openDriveMap(drive) {
 
   const blob = new Blob([html], { type: 'text/html' });
   const url  = URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  if (isStandalone) {
+    window.location.href = url;
+  } else {
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
 }
 
 function downloadFile(content, filename, mimeType) {
