@@ -2776,7 +2776,7 @@ function renderPoiMarkersOnMap() {
     const marker = L.marker([poi.lat, poi.lng], {
       icon: L.divIcon({
         className: '',
-        html: `<div class="poi-marker" style="background:${cat.color}">${cat.icon}</div>`,
+        html: `<div style="width:32px;height:32px;border-radius:8px;background:${cat.color};display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,.3);border:2px solid rgba(255,255,255,.9)">${cat.icon}</div>`,
         iconSize: [32, 32], iconAnchor: [16, 16],
       }),
       zIndexOffset: 500,
