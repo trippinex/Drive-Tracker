@@ -16,7 +16,7 @@
 'use strict';
 
 // Current app version — update this with every release.
-const APP_VERSION = '1.7.4';
+const APP_VERSION = '1.7.5';
 const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
@@ -2727,12 +2727,10 @@ let _preferredVoice = null;
 function _initPreferredVoice() {
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return;
-  _preferredVoice =
-    voices.find(v => v.name === 'Google US English') ||
-    voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('enhanced')) ||
-    voices.find(v => v.name === 'Samantha') ||
-    voices.find(v => v.lang === 'en-US') ||
-    null;
+  // Only override the system default on Chrome where Google US English is
+  // meaningfully better. On Safari/iOS the user configures their preferred
+  // TTS voice in system settings — don't stomp it.
+  _preferredVoice = voices.find(v => v.name === 'Google US English') || null;
 }
 
 // Mobile browsers block speechSynthesis.speak() unless primed by a user gesture.

@@ -21,6 +21,7 @@ Update this file when a feature moves from one stage to the next.
 | v1.6.1 | Mobile map view fixes — bottom pill overlap, Safari popup block, zoom control collision, consistent pill spacing, CDN deploy pipeline |
 | v1.7.0 | POI Management Phase 1 (DT-018) — Firestore-backed POIs, 8 categories, Nominatim geocoding, management panel, map markers on all views, voice announcements with entry-detection |
 | v1.7.4 | Safari voice quality — prefer Samantha / Enhanced voices; fix voice selection precedence bug |
+| v1.7.5 | Safari voice respects iOS system TTS preference — no longer overrides user-selected voice |
 
 ---
 

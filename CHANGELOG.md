@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.5] - 2026-06-21
+
+### Fixed
+
+- **Safari voice selection ignoring system preference** — on iOS/macOS Safari, the app was overriding the browser's default TTS voice with a hardcoded "Samantha" preference, ignoring whatever voice the user configured in iOS Settings. Now only Chrome/Android overrides the voice (to prefer `Google US English`); Safari lets the system default win so user-selected voices like Ava Enhanced work as expected.
+
+---
+
 ## [1.7.4] - 2026-06-21
 
 ### Fixed
