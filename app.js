@@ -1504,13 +1504,21 @@ async function openDriveMap(drive) {
       white-space: nowrap;
     }
 
+    /* Top pill stack — mirrors #bottom-pills so gap is identical */
+    #top-pills {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      z-index: 1000;
+    }
+    #info, #replay-hud { position: relative; left: auto; transform: none; }
+
     /* Drive info pill */
-    #info { top: 14px; padding: 10px 20px; display: flex; align-items: center; gap: 16px; }
+    #info { padding: 10px 20px; display: flex; align-items: center; gap: 16px; }
     #info strong { color: #f97316; font-size: 14px; font-weight: 700; }
     #info span   { font-size: 13px; color: #94a3b8; }
 
     /* Replay HUD */
-    #replay-hud { top: 72px; padding: 8px 24px; display: flex; align-items: center; gap: 24px; }
+    #replay-hud { padding: 8px 24px; display: flex; align-items: center; gap: 24px; }
     .hud-item  { display: flex; flex-direction: column; align-items: center; gap: 2px; }
     .hud-label { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; }
     .hud-value { font-size: 15px; font-weight: 700; color: #f1f5f9; font-variant-numeric: tabular-nums; }
@@ -1592,24 +1600,24 @@ async function openDriveMap(drive) {
     Back
   </div>
   <style>
-    /* In standalone mode the Back button occupies the top row — push pills down */
-    #info       { top: 62px; }
-    #replay-hud { top: 120px; }
+    /* In standalone mode the Back button occupies the top row — push pill stack down */
+    #top-pills { top: 62px; }
   </style>` : ''}
-  <div id="info" class="glass-pill">
-    <strong>${escapeHTML(drive.vehicle || 'Drive')}</strong>
-    <span>${new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-    <span>${stats}</span>
-  </div>
-
-  <div id="replay-hud" class="glass-pill">
-    <div class="hud-item">
-      <span class="hud-label">Time</span>
-      <span class="hud-value" id="hud-time">--:-- --</span>
+  <div id="top-pills">
+    <div id="info" class="glass-pill">
+      <strong>${escapeHTML(drive.vehicle || 'Drive')}</strong>
+      <span>${new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+      <span>${stats}</span>
     </div>
-    <div class="hud-item">
-      <span class="hud-label">Speed</span>
-      <span class="hud-value" id="hud-speed">-- MPH</span>
+    <div id="replay-hud" class="glass-pill">
+      <div class="hud-item">
+        <span class="hud-label">Time</span>
+        <span class="hud-value" id="hud-time">--:-- --</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">Speed</span>
+        <span class="hud-value" id="hud-speed">-- MPH</span>
+      </div>
     </div>
   </div>
 
