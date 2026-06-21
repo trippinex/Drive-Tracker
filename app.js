@@ -1590,7 +1590,12 @@ async function openDriveMap(drive) {
   <div id="nav-spacer" aria-hidden="true">
     <svg width="8" height="13" viewBox="0 0 8 13"></svg>
     Back
-  </div>` : ''}
+  </div>
+  <style>
+    /* In standalone mode the Back button occupies the top row — push pills down */
+    #info       { top: 62px; }
+    #replay-hud { top: 120px; }
+  </style>` : ''}
   <div id="info" class="glass-pill">
     <strong>${escapeHTML(drive.vehicle || 'Drive')}</strong>
     <span>${new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
