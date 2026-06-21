@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.1] - 2026-06-21
+
+### Fixed
+
+#### Mobile / PWA map view fixes
+
+- **Bottom pills overlapping** — Replaced independently-positioned `#replay-controls` and `#dna` pills with a `#bottom-pills` flex column container; the DNA pill wraps to two rows on narrow phones making a fixed `bottom: 80px` offset insufficient. The container now stacks pills with a consistent 8px gap regardless of pill height.
+- **Map button did nothing in Safari** — Two root causes fixed: (1) Safari rejects `window.open()` called after any `await` in an async function (user gesture consumed) — fixed by opening a blank window synchronously before any async work then navigating it to the blob URL; (2) `window.open()` is silently blocked in iOS PWA standalone mode — fixed by detecting `navigator.standalone` and using `window.location.href` instead.
+- **Zoom control overlapping top pills** — Leaflet's default `topleft` zoom control collided with the info pill on mobile. Removed on touch devices (pinch-to-zoom is the native gesture); moved to `bottomright` on desktop.
+- **Top pills inconsistent spacing** — Wrapped `#info` and `#replay-hud` in a `#top-pills` flex column container mirroring `#bottom-pills`, giving both pairs an identical 8px gap driven by actual rendered heights.
+
+#### Deploy pipeline fixes
+
+- **CDN invalidation failing on deploy** — `deploy.sh` was targeting the wrong GCP project (`hermes-498713` instead of `drive-tracker-497900`). Added `--project drive-tracker-497900`; deploys now flush the CDN instantly.
+- **Versioned asset CDN TTL** — Reduced `max-age` on `app.js`, `styles.css`, and `theme.css` from 1 hour to 5 minutes as a fallback for when CDN invalidation is unavailable.
+
+---
+
 ## [1.6.0] - 2026-06-21
 
 ### Added

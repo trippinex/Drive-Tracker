@@ -18,6 +18,7 @@ Update this file when a feature moves from one stage to the next.
 | v1.5.0 | Drive History panel hardening — XSS fixes, a11y, performance, mobile UX |
 | v1.5.1 | Drive recovery after OS kill |
 | v1.6.0 | Drive Replay / Animation (DT-008) |
+| v1.6.1 | Mobile map view fixes — bottom pill overlap, Safari popup block, zoom control collision, consistent pill spacing, CDN deploy pipeline |
 
 ---
 
