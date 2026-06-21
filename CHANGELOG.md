@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.7] - 2026-06-21
+
+### Changed
+
+- **Hamburger menu order** — reordered items to follow standard PWA/mobile conventions: History (primary action) → Garage → Points of Interest → Voice (settings cluster) → Sync (utility) → About → Sign Out. Previously About was 3rd and Sync was 2nd, which broke the expected pattern found in iOS Settings, Android, and common app navigation.
+
+---
+
 ## [1.7.6] - 2026-06-21
 
 ### Added
