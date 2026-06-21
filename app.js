@@ -1562,26 +1562,6 @@ async function openDriveMap(drive) {
     .dna-grade { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 2px; }
     .dna-item  { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 
-    /* Back button (standalone / PWA mode only) */
-    #back-btn {
-      position: fixed; top: 14px; left: 14px; z-index: 1001;
-      display: flex; align-items: center; gap: 6px;
-      padding: 10px 14px; border: none; border-radius: 10px; cursor: pointer;
-      background: rgba(15,23,42,0.92); color: #f1f5f9;
-      font-size: 14px; font-weight: 600; font-family: system-ui, sans-serif;
-      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-      -webkit-tap-highlight-color: transparent;
-    }
-    /* Invisible right-side counterweight — mirrors the back button width so
-       the info pill at left:50% lands in the visual centre of the free space. */
-    #nav-spacer {
-      position: fixed; top: 14px; right: 14px; z-index: 1001;
-      visibility: hidden; pointer-events: none;
-      display: flex; align-items: center; gap: 6px;
-      padding: 10px 14px; font-size: 14px; font-weight: 600;
-    }
-
     /* Route direction arrows */
     .route-arrow { display: flex; align-items: center; justify-content: center; }
 
@@ -1591,18 +1571,6 @@ async function openDriveMap(drive) {
   </style>
 </head>
 <body>
-  ${isStandalone ? `<button id="back-btn" onclick="history.back()">
-    <svg width="8" height="13" viewBox="0 0 8 13" fill="currentColor"><polygon points="8,0 1,6.5 8,13"/></svg>
-    Back
-  </button>
-  <div id="nav-spacer" aria-hidden="true">
-    <svg width="8" height="13" viewBox="0 0 8 13"></svg>
-    Back
-  </div>
-  <style>
-    /* In standalone mode the Back button occupies the top row — push pill stack down */
-    #top-pills { top: 62px; }
-  </style>` : ''}
   <div id="top-pills">
     <div id="info" class="glass-pill">
       <strong>${escapeHTML(drive.vehicle || 'Drive')}</strong>
