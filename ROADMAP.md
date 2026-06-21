@@ -43,6 +43,7 @@ Update this file when a feature moves from one stage to the next.
 | DT-014 | Claude AI Drive Analysis | Analyze button on Drive History entries; sends drive data to Claude via GCP Cloud Function proxy (Firebase JWT auth, Secret Manager for API key); displays car-enthusiast-style analysis dialog. Medium scope. |
 | DT-015 | Shared Garage (FuelTracker integration) | Single Firestore-backed vehicle garage at `users/{uid}/vehicles/{id}` shared between DriveTracker and FuelTracker via onSnapshot. Requires vehicle schema alignment and SQLite→Firestore migration for FuelTracker. Medium-High scope. |
 | DT-016 | Cost Per Drive (FuelTracker integration) | Display estimated fuel cost on Drive History cards using FuelTracker's rolling MPG and last fuel price (`distance ÷ MPG × $/gal`). Depends on DT-015. Low-Medium scope. |
+| DT-017 | Drive Share | Generate a shareable link for any drive that opens the full map view and replay for anyone — no login required. Recipient sees the route, Drive DNA scores, and can use all replay controls (play/pause/stop/seek/speed). Link contains or references the drive's coordinate data. Medium scope. |
 
 ---
 
