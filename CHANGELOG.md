@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.1] - 2026-06-21
+
+### Fixed
+
+- **POI voice announcements silent on mobile** (BUG-002) — Mobile browsers (iOS Safari, Chrome) block `speechSynthesis.speak()` unless called from a user gesture. Added a one-time `touchstart`/`click` listener that fires a silent zero-volume utterance to unlock the speech engine for the session. Applied to both live recording and drive replay.
+
+---
+
 ## [1.7.0] - 2026-06-21
 
 ### Added

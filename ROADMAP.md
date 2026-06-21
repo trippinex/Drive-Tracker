@@ -29,7 +29,7 @@ Update this file when a feature moves from one stage to the next.
 
 | ID | Bug | Notes |
 |---|---|---|
-| BUG-002 | POI voice announcements silent on mobile (iOS Safari + Chrome) | `speechSynthesis.speak()` called outside a user gesture is blocked on mobile browsers. Works on desktop. Affects both live recording and drive replay. |
+| BUG-002 | ~~POI voice announcements silent on mobile (iOS Safari + Chrome)~~ | Fixed in v1.7.1 — silent unlock utterance on first touch/click. |
 
 ---
 
