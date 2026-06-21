@@ -1442,6 +1442,13 @@ async function getDriveGroup(drive) {
 
 /** Open the drive route in a full-screen map in a new browser tab. */
 async function openDriveMap(drive) {
+  const isStandalone = window.navigator.standalone === true ||
+                       window.matchMedia('(display-mode: standalone)').matches;
+
+  // Safari blocks window.open() after any await (user gesture consumed).
+  // Open the blank window synchronously before any async work.
+  const newWin = isStandalone ? null : window.open('', '_blank');
+
   // Combine all parts for multi-part drives so the full route is shown.
   const parts      = await getDriveGroup(drive);
   const allCoords  = parts.flatMap(p => p.coordinates || []);
@@ -1474,9 +1481,6 @@ async function openDriveMap(drive) {
     const bearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
     arrowData.push({ lat: c[0], lng: c[1], bearing });
   }
-
-  const isStandalone = window.navigator.standalone === true ||
-                       window.matchMedia('(display-mode: standalone)').matches;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -1880,7 +1884,7 @@ async function openDriveMap(drive) {
   if (isStandalone) {
     window.location.href = url;
   } else {
-    window.open(url, '_blank');
+    newWin.location.href = url;
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 }
