@@ -1,31 +1,32 @@
-﻿# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# DriveTracker â€” Google Cloud Build CI/CD Pipeline
+
+# DriveTracker - Google Cloud Build CI/CD Pipeline
 #
 # Triggered automatically on every push to the `main` branch via a Cloud Build
 # GitHub trigger (configured in GCP Console or via gcloud CLI).
 #
-# What this pipeline does:
-#   1. (Optional) Validates the project structure / runs linting.
-#   2. Deploys all static assets to GCS with appropriate cache-control headers.
-#   3. Specifically sets `no-cache` on sw.js so browsers always re-fetch the
-#      service worker and pick up new versions without being stuck on a stale SW.
+# Deployment strategy for critical files (index.html, app.js, app2.js, sw.js, config.js):
+#   - Uploaded atomically with Cache-Control: no-cache so the CDN header is set at the
+#     exact moment of upload (no race window where rsync writes without the header).
+#   - app.js is deployed under BOTH app.js and app2.js. index.html references app2.js.
+#     app.js is also kept current so users hitting a stale CDN-cached index.html (which
+#     may still reference /app.js?v=N) always get the latest code.
+#   - The SW (sw.js) must be no-cache so browsers detect new versions immediately.
 #
 # Pre-requisites:
-#   - A GCS bucket named ${_BUCKET} already configured for static website hosting.
-#   - The Cloud Build service account has `roles/storage.objectAdmin` on the bucket.
+#   - A GCS bucket named ${_BUCKET} configured for static website hosting.
+#   - The Cloud Build service account has roles/storage.objectAdmin on the bucket.
 #   - Substitution variables set in the trigger (see "Substitutions" below).
 #
 # Substitutions (set in Cloud Build trigger UI or --substitutions flag):
-#   _BUCKET      : Your GCS bucket name, e.g. DriveTracker-app
-#   _REGION      : GCS bucket region, e.g. us-central1 (informational only)
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#   _BUCKET : Your GCS bucket name, e.g. drive-tracker-497900
+#   _REGION : GCS bucket region, e.g. us-central1 (informational only)
 
 substitutions:
-  _BUCKET: DriveTracker-app          # override in the trigger with your bucket name
+  _BUCKET: DriveTracker-app
   _REGION: us-central1
 
 options:
-  logging: CLOUD_LOGGING_ONLY    # send logs to Cloud Logging, not GCS
+  logging: CLOUD_LOGGING_ONLY
 
 availableSecrets:
   secretManager:
@@ -46,9 +47,7 @@ availableSecrets:
 
 steps:
 
-  # ── Step 0: Generate config.js from Secret Manager ───────────────────────────
-  # Secrets are injected as env vars by Cloud Build; config.js is written to the
-  # workspace and deployed alongside other assets but never committed to source control.
+  # -- Step 0: Generate config.js from Secret Manager ---------------------------
   - name: 'bash'
     id: 'generate-config'
     secretEnv:
@@ -74,7 +73,7 @@ steps:
         printf "};\n" >> config.js
         echo "config.js generated from Secret Manager"
 
-  # â”€â”€ Step 1: Validate project files exist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # -- Step 1: Validate required source files exist -----------------------------
   - name: 'bash'
     id: 'validate'
     entrypoint: 'bash'
@@ -87,34 +86,79 @@ steps:
             echo "ERROR: Missing required file: $$f"
             exit 1
           fi
-          echo "  âœ“ $$f"
+          echo "  OK $$f"
         done
         echo "All required files present."
 
-  # â”€â”€ Step 2: Deploy all assets EXCEPT sw.js â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  # Cache-Control: public, max-age=31536000 (1 year) for versioned/hashed assets.
-  # For this single-file app we use a moderate 1-hour cache for HTML/JS/CSS so
-  # updates propagate within an hour without hammering origin servers.
+  # -- Step 2: Deploy versioned assets (CSS, icons, manifest, etc.) -------------
+  # These files use query-string versioning (?v=N) so CDN caching is safe.
+  # Critical files (index.html, app.js, app2.js, sw.js, config.js) are excluded
+  # from rsync and uploaded atomically with no-cache headers in subsequent steps.
   - name: 'gcr.io/cloud-builders/gsutil'
     id: 'deploy-assets'
     waitFor: ['validate']
     args:
-      - '-m'                                          # parallel transfer
+      - '-m'
       - 'rsync'
-      - '-r'                                          # recursive
-      - '-d'                                          # delete removed files
+      - '-r'
+      - '-d'
       - '-x'
-      - 'sw\.js'                                      # exclude sw.js (handled separately)
+      - 'sw\.js|app2?\.js|index\.html|config\.js|\.git|\.env|\.claude|DEPLOY\.md|CHANGELOG\.md|README\.md|ROADMAP\.md|cloudbuild\.yaml|generate-config\.ps1|firebase\.json|\.firebaserc|deploy\.sh|ui-theme/|graphify-out/'
       - '-h'
       - 'Cache-Control:public, max-age=3600, must-revalidate'
       - '.'
       - 'gs://${_BUCKET}/'
 
-  # â”€â”€ Step 3: Deploy sw.js with no-cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  # The service worker MUST be served with Cache-Control: no-cache so browsers
-  # check for an updated version on every navigation, enabling the SW update flow.
-  # If sw.js were cached aggressively, users could be stuck on old versions for
-  # hours/days even after a deployment.
+  # ui-theme/theme.css is referenced by the SW shell — deploy it explicitly
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'deploy-theme'
+    waitFor: ['validate']
+    args:
+      - 'cp'
+      - '-h'
+      - 'Cache-Control:public, max-age=3600, must-revalidate'
+      - 'ui-theme/theme.css'
+      - 'gs://${_BUCKET}/ui-theme/theme.css'
+
+  # -- Step 3: Deploy critical no-cache files atomically ------------------------
+  # Each file gets its Cache-Control header in the same upload command so there
+  # is no race window where the CDN can cache content without the no-cache header.
+
+  # index.html: network entry point — must never be CDN-cached
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'deploy-index'
+    waitFor: ['validate']
+    args:
+      - 'cp'
+      - '-h'
+      - 'Cache-Control:no-cache, no-store, must-revalidate'
+      - 'index.html'
+      - 'gs://${_BUCKET}/index.html'
+
+  # app2.js: primary JS entry point referenced by index.html
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'deploy-app2'
+    waitFor: ['validate']
+    args:
+      - 'cp'
+      - '-h'
+      - 'Cache-Control:no-cache, no-store, must-revalidate'
+      - 'app.js'
+      - 'gs://${_BUCKET}/app2.js'
+
+  # app.js: kept current so stale CDN-cached index.html (referencing /app.js?v=N)
+  # still loads the latest code rather than breaking with old behavior
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'deploy-appjs'
+    waitFor: ['validate']
+    args:
+      - 'cp'
+      - '-h'
+      - 'Cache-Control:no-cache, no-store, must-revalidate'
+      - 'app.js'
+      - 'gs://${_BUCKET}/app.js'
+
+  # sw.js: service worker must be no-cache so browsers detect updates immediately
   - name: 'gcr.io/cloud-builders/gsutil'
     id: 'deploy-sw'
     waitFor: ['validate']
@@ -125,12 +169,21 @@ steps:
       - 'sw.js'
       - 'gs://${_BUCKET}/sw.js'
 
-  # â”€â”€ Step 4: Set bucket-level CORS and website config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  # Idempotent â€” safe to run on every deploy. Ensures CORS is correct if the
-  # bucket is re-created or settings drift.
+  # config.js: contains injected secrets — must never be SW-cached or CDN-cached
+  - name: 'gcr.io/cloud-builders/gsutil'
+    id: 'deploy-config'
+    waitFor: ['generate-config']
+    args:
+      - 'cp'
+      - '-h'
+      - 'Cache-Control:no-cache, no-store, must-revalidate'
+      - 'config.js'
+      - 'gs://${_BUCKET}/config.js'
+
+  # -- Step 4: Set bucket-level website config ----------------------------------
   - name: 'gcr.io/cloud-builders/gsutil'
     id: 'set-website-config'
-    waitFor: ['deploy-assets', 'deploy-sw']
+    waitFor: ['deploy-assets', 'deploy-index', 'deploy-app2', 'deploy-appjs', 'deploy-sw', 'deploy-config', 'deploy-theme']
     args:
       - 'web'
       - 'set'
@@ -140,7 +193,7 @@ steps:
       - '404.html'
       - 'gs://${_BUCKET}'
 
-  # â”€â”€ Step 5: Make all objects publicly readable â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # -- Step 5: Make all objects publicly readable -------------------------------
   - name: 'gcr.io/cloud-builders/gsutil'
     id: 'set-public-acl'
     waitFor: ['set-website-config']
@@ -150,7 +203,7 @@ steps:
       - 'allUsers:objectViewer'
       - 'gs://${_BUCKET}'
 
-  # â”€â”€ Step 6: Verify deployment â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # -- Step 6: Smoke test -------------------------------------------------------
   - name: 'gcr.io/cloud-builders/curl'
     id: 'smoke-test'
     waitFor: ['set-public-acl']
@@ -159,16 +212,24 @@ steps:
       - '-c'
       - |
         echo "=== Smoke-testing deployment ==="
-        STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-          "https://storage.googleapis.com/${_BUCKET}/index.html")
-        if [ "$$STATUS" != "200" ]; then
-          echo "ERROR: index.html returned HTTP $$STATUS"
+        for path in index.html app2.js sw.js; do
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://storage.googleapis.com/${_BUCKET}/$$path")
+          if [ "$$STATUS" != "200" ]; then
+            echo "ERROR: $$path returned HTTP $$STATUS"
+            exit 1
+          fi
+          echo "  OK $$path (200)"
+        done
+        # Verify app2.js is referenced in index.html
+        if ! curl -s "https://storage.googleapis.com/${_BUCKET}/index.html" | grep -q 'app2\.js'; then
+          echo "ERROR: index.html does not reference app2.js"
           exit 1
         fi
-        echo "  âœ“ index.html returned 200"
+        echo "  OK index.html references app2.js"
         SW_CACHE=$(curl -sI "https://storage.googleapis.com/${_BUCKET}/sw.js" \
           | grep -i cache-control)
         echo "  sw.js Cache-Control: $$SW_CACHE"
         echo "Deployment verified."
 
-timeout: '600s'   # 10 min timeout â€” generous for slow gsutil syncs on large tile caches
+timeout: '600s'

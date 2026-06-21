@@ -1556,6 +1556,256 @@ async function openDriveMap(drive) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// DRIVE REPLAY (DT-008)
+// Opens in a new tab (same pattern as openDriveMap) to avoid
+// in-page stacking context conflicts with the login overlay.
+// ═══════════════════════════════════════════════════════════════
+
+async function openReplay(drive) {
+  const parts     = await getDriveGroup(drive);
+  const allCoords = parts.flatMap(p => p.coordinates || []);
+
+  if (allCoords.length < 2) { showToast('Not enough GPS points to replay.', 3000); return; }
+
+  allCoords.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  const totalMs = (allCoords[allCoords.length - 1].ts || 0) - (allCoords[0].ts || 0);
+  if (totalMs <= 0) { showToast('Drive timestamps unavailable for replay.', 3000); return; }
+
+  const cumDist = [0];
+  for (let i = 1; i < allCoords.length; i++) {
+    cumDist.push(cumDist[i - 1] + haversine(
+      allCoords[i - 1].lat, allCoords[i - 1].lng,
+      allCoords[i].lat,     allCoords[i].lng
+    ));
+  }
+
+  const driveDate = new Date(drive.startedAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const title     = `${drive.vehicle || 'Drive'} — ${driveDate}`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHTML(title)} — Replay</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #0f172a; font-family: system-ui, sans-serif; }
+    #map { position: absolute; inset: 0; }
+    #hud {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+      background: rgba(15,23,42,0.92); color: #f1f5f9;
+      padding: 10px 18px; border-radius: 14px; z-index: 1000;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.35); backdrop-filter: blur(8px);
+      white-space: nowrap; max-width: calc(100vw - 32px);
+    }
+    #hud-title { font-size: 13px; font-weight: 700; color: #f97316; letter-spacing: -.2px; }
+    #hud-stats { display: flex; align-items: center; gap: 10px; }
+    .hstat { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+    .hval  { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; color: #f1f5f9; line-height: 1; }
+    .hlbl  { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #64748b; font-weight: 600; }
+    .hsep  { width: 1px; height: 28px; background: #334155; flex-shrink: 0; }
+    #close-btn {
+      position: fixed; top: 14px; right: 14px; z-index: 1000;
+      background: rgba(15,23,42,0.85); border: 1px solid #334155; color: #94a3b8;
+      width: 36px; height: 36px; border-radius: 50%; font-size: 14px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    #close-btn:hover { background: #1e293b; color: #f1f5f9; }
+    #controls {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: rgba(15,23,42,0.92); border-radius: 16px; padding: 12px 16px;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.35); backdrop-filter: blur(8px);
+      z-index: 1000; max-width: calc(100vw - 32px);
+    }
+    .cbtn {
+      background: #1e293b; border: 1px solid #334155; color: #f1f5f9;
+      width: 36px; height: 36px; border-radius: 10px; font-size: 14px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; touch-action: manipulation;
+    }
+    .cbtn:hover { background: #334155; }
+    #play-btn { background: #f97316; border-color: #f97316; }
+    #play-btn:hover { background: #ea580c; }
+    .spd {
+      background: #1e293b; border: 1px solid #334155; color: #64748b;
+      padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700;
+      cursor: pointer; white-space: nowrap; touch-action: manipulation;
+    }
+    .spd.on { background: #f97316; border-color: #f97316; color: #fff; }
+    #scrub {
+      -webkit-appearance: none; appearance: none;
+      width: 120px; height: 4px; border-radius: 2px;
+      background: #334155; outline: none; cursor: pointer; flex-shrink: 0;
+    }
+    #scrub::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+      background: #f97316; cursor: pointer; border: 2px solid #fff;
+    }
+    #scrub::-moz-range-thumb {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #f97316; cursor: pointer; border: 2px solid #fff;
+    }
+    .car-icon { display: flex; align-items: center; justify-content: center;
+                filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="hud">
+    <div id="hud-title">${escapeHTML(title)}</div>
+    <div id="hud-stats">
+      <div class="hstat"><span class="hval" id="v-spd">0</span><span class="hlbl">mph</span></div>
+      <div class="hsep"></div>
+      <div class="hstat"><span class="hval" id="v-ela">00:00:00</span><span class="hlbl">elapsed</span></div>
+      <div class="hsep"></div>
+      <div class="hstat"><span class="hval" id="v-clk">--</span><span class="hlbl">time</span></div>
+      <div class="hsep"></div>
+      <div class="hstat"><span class="hval" id="v-dst">0.00</span><span class="hlbl">mi driven</span></div>
+    </div>
+  </div>
+  <button id="close-btn" title="Close">&#x2715;</button>
+  <div id="controls">
+    <button class="cbtn" id="restart-btn" title="Restart">&#x23EE;</button>
+    <button class="cbtn" id="play-btn"    title="Play/Pause">&#x25B6;</button>
+    <div style="display:flex;gap:4px">
+      <button class="spd on" data-s="1">1&times;</button>
+      <button class="spd"    data-s="2">2&times;</button>
+      <button class="spd"    data-s="4">4&times;</button>
+      <button class="spd"    data-s="8">8&times;</button>
+    </div>
+    <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Seek" />
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+  <script>
+    const coords  = ${JSON.stringify(allCoords)};
+    const cumDist = ${JSON.stringify(cumDist)};
+    const totalMs = ${totalMs};
+    const startTs = ${allCoords[0].ts || 0};
+
+    const map = L.map('map', { zoomControl: true });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 19
+    }).addTo(map);
+    const lls  = coords.map(c => [c.lat, c.lng]);
+    const poly = L.polyline(lls, { color: '#f97316', weight: 4, opacity: 0.9 }).addTo(map);
+    L.circleMarker(lls[0], { radius: 7, color: '#fff', weight: 2, fillColor: '#22c55e', fillOpacity: 1 }).addTo(map);
+    L.circleMarker(lls[lls.length - 1], { radius: 7, color: '#fff', weight: 2, fillColor: '#ef4444', fillOpacity: 1 }).addTo(map);
+    map.fitBounds(poly.getBounds(), { padding: [80, 80] });
+
+    const carIcon = L.divIcon({
+      className: '',
+      html: '<div class="car-icon"><svg viewBox="0 0 10 14" width="18" height="25"><polygon points="5,0 10,14 5,10 0,14" fill="#f97316"/><\\/svg><\\/div>',
+      iconSize: [18, 25], iconAnchor: [9, 12]
+    });
+    const car = L.marker(lls[0], { icon: carIcon, zIndexOffset: 1000 }).addTo(map);
+    let carEl = null;
+    requestAnimationFrame(() => { carEl = car.getElement()?.querySelector('.car-icon'); });
+
+    let st = { ms: 0, playing: false, speed: 1, wall: 0, raf: null };
+
+    function brg(la1, ln1, la2, ln2) {
+      const dL = (ln2 - ln1) * Math.PI / 180;
+      const y  = Math.sin(dL) * Math.cos(la2 * Math.PI / 180);
+      const x  = Math.cos(la1 * Math.PI / 180) * Math.sin(la2 * Math.PI / 180) -
+                 Math.sin(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.cos(dL);
+      return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+    function fmt(sec) {
+      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+      return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+    }
+
+    function seek(driveMs) {
+      const ts = startTs + driveMs;
+      let lo = 0, hi = coords.length - 1;
+      while (lo < hi) { const mid = (lo + hi + 1) >> 1; if ((coords[mid].ts || 0) <= ts) lo = mid; else hi = mid - 1; }
+      const i = lo;
+      let lat, lng, spd, bear;
+      if (i >= coords.length - 1) {
+        lat = coords[i].lat; lng = coords[i].lng; spd = 0; bear = 0;
+      } else {
+        const p0 = coords[i], p1 = coords[i + 1];
+        const seg = Math.max(1, (p1.ts || 0) - (p0.ts || 0));
+        const t   = Math.max(0, Math.min(1, (ts - (p0.ts || 0)) / seg));
+        lat  = p0.lat + (p1.lat - p0.lat) * t;
+        lng  = p0.lng + (p1.lng - p0.lng) * t;
+        const s0 = p0.speed != null && p0.speed >= 0 ? p0.speed * 2.23694 : 0;
+        const s1 = p1.speed != null && p1.speed >= 0 ? p1.speed * 2.23694 : 0;
+        spd  = s0 + (s1 - s0) * t;
+        bear = brg(p0.lat, p0.lng, p1.lat, p1.lng);
+      }
+      car.setLatLng([lat, lng]);
+      if (carEl) carEl.style.transform = 'rotate(' + bear + 'deg)';
+      map.setView([lat, lng], map.getZoom(), { animate: false });
+
+      const distFrac = i < coords.length - 1 ? Math.max(0, Math.min(1,
+        (ts - (coords[i].ts || 0)) / Math.max(1, ((coords[i + 1]?.ts || 0) - (coords[i].ts || 0)))
+      )) : 0;
+      const distMi = cumDist[i] + (i < cumDist.length - 1 ? cumDist[i + 1] - cumDist[i] : 0) * distFrac;
+
+      const clk = new Date(startTs + driveMs);
+      const hh  = clk.getHours(), mm = String(clk.getMinutes()).padStart(2, '0');
+      document.getElementById('v-spd').textContent = spd.toFixed(0);
+      document.getElementById('v-ela').textContent = fmt(Math.floor(driveMs / 1000));
+      document.getElementById('v-clk').textContent = (hh % 12 || 12) + ':' + mm + ' ' + (hh >= 12 ? 'PM' : 'AM');
+      document.getElementById('v-dst').textContent = distMi.toFixed(2);
+      document.getElementById('scrub').value = Math.round((driveMs / totalMs) * 1000);
+    }
+
+    function tick(now) {
+      if (!st.playing) return;
+      st.ms = Math.min(st.ms + (now - st.wall) * st.speed, totalMs);
+      st.wall = now;
+      seek(st.ms);
+      if (st.ms >= totalMs) { st.playing = false; document.getElementById('play-btn').innerHTML = '&#x25B6;'; return; }
+      st.raf = requestAnimationFrame(tick);
+    }
+
+    function togglePlay() {
+      if (st.ms >= totalMs) st.ms = 0;
+      st.playing = !st.playing;
+      document.getElementById('play-btn').innerHTML = st.playing ? '&#x23F8;' : '&#x25B6;';
+      if (st.playing) { st.wall = performance.now(); st.raf = requestAnimationFrame(tick); }
+      else cancelAnimationFrame(st.raf);
+    }
+
+    document.getElementById('play-btn').addEventListener('click', togglePlay);
+    document.getElementById('restart-btn').addEventListener('click', () => {
+      cancelAnimationFrame(st.raf); st.playing = false; st.ms = 0;
+      document.getElementById('play-btn').innerHTML = '&#x25B6;'; seek(0);
+    });
+    document.getElementById('close-btn').addEventListener('click', () => window.close());
+    document.querySelectorAll('.spd').forEach(btn => {
+      btn.addEventListener('click', () => {
+        st.speed = Number(btn.dataset.s);
+        document.querySelectorAll('.spd').forEach(b => b.classList.toggle('on', b === btn));
+      });
+    });
+    document.getElementById('scrub').addEventListener('input', e => {
+      st.ms = (Number(e.target.value) / 1000) * totalMs; seek(st.ms);
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+      if (e.key === 'Escape') window.close();
+    });
+
+    seek(0);
+    document.getElementById('play-btn').focus();
+  <\/script>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 function downloadFile(content, filename, mimeType) {
   const blob = new Blob([content], { type: mimeType });
   const url  = URL.createObjectURL(blob);
@@ -1638,6 +1888,7 @@ async function renderHistory() {
             </div>
             <div class="history-item-actions">
               <button class="export-btn map-view-btn" data-format="map" aria-label="View map for ${driveLabel}">🗺 Map</button>
+              <button class="export-btn" data-format="replay" aria-label="Replay ${driveLabel}">▶ Replay</button>
               <button class="export-btn" data-format="gpx" aria-label="Export GPX for ${driveLabel}">↓ GPX</button>
               <button class="export-btn" data-format="kml" aria-label="Export KML for ${driveLabel}">↓ KML</button>
               <button class="export-btn" data-format="ai" aria-label="Copy AI export for ${driveLabel}">⊕ AI</button>
@@ -1677,7 +1928,8 @@ async function renderHistory() {
             return;
           }
 
-          if (format === 'map') { openDriveMap(drive); return; }
+          if (format === 'map')    { openDriveMap(drive); return; }
+          if (format === 'replay') { closeHistory(); openReplay(drive); return; }
 
           // GPX / KML / AI — use in-memory drives array, no extra IDB read.
           const parts = drive.driveGroupId

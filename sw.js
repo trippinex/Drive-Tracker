@@ -15,9 +15,9 @@
 // v3: evicts the old shell that still contained app.js with seedDefaultVehicles().
 // Any device running the v2 shell was serving stale app.js which re-seeded
 // the default vehicles on every fresh IndexedDB, regardless of the DB v3 migration.
-const SHELL_CACHE   = 'DriveTracker-shell-v30';
-const CDN_CACHE     = 'DriveTracker-cdn-v30';
-const TILE_CACHE    = 'DriveTracker-tiles-v30';
+const SHELL_CACHE   = 'DriveTracker-shell-v37';
+const CDN_CACHE     = 'DriveTracker-cdn-v37';
+const TILE_CACHE    = 'DriveTracker-tiles-v37';
 const MAX_TILES     = 2000;   // tile entries cap (~50 MB at avg 25 KB/tile)
 const MAX_TILE_AGE  = 7 * 24 * 60 * 60 * 1000;  // 7 days in ms
 
@@ -28,8 +28,8 @@ const MAX_TILE_AGE  = 7 * 24 * 60 * 60 * 1000;  // 7 days in ms
 // cache.addAll() fails the entire SW install if ANY asset returns non-200.
 const SHELL_ASSETS = [
   '/index.html',
-  '/app.js?v=29',
-  '/styles.css?v=29',
+  '/app2.js',
+  '/styles.css?v=33',
   '/manifest.json',
   '/ui-theme/theme.css?v=27',
 ];
@@ -153,13 +153,29 @@ async function networkFirst(request, cacheName) {
   try {
     const response = await fetch(request);
     if (response.ok) {
+      // Patch stale CDN-cached index.html that still references app.js?v=N instead of app2.js.
+      // Cloud CDN caches /index.html and / separately; if the / entry is stale we fix it here.
+      const url = new URL(request.url);
+      if (url.pathname === '/' || url.pathname === '/index.html') {
+        const text = await response.text();
+        const cache = await caches.open(cacheName);
+        const finalText = text.includes('/app.js?v=')
+          ? text.replace(/\/app\.js\?v=\d+/g, '/app2.js')
+          : text;
+        const headers = new Headers(response.headers);
+        headers.delete('Content-Length');
+        headers.delete('Content-Encoding');
+        const finalResp = new Response(finalText, { status: response.status, statusText: response.statusText, headers });
+        cache.put(request, finalResp.clone());
+        return finalResp;
+      }
       const cache = await caches.open(cacheName);
       cache.put(request, response.clone());
     }
     return response;
   } catch {
     const cached = await caches.match(request);
-    return cached || new Response('Offline â€” resource unavailable.', { status: 503 });
+    return cached || new Response('Offline — resource unavailable.', { status: 503 });
   }
 }
 
