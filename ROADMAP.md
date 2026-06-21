@@ -19,6 +19,7 @@ Update this file when a feature moves from one stage to the next.
 | v1.5.1 | Drive recovery after OS kill |
 | v1.6.0 | Drive Replay / Animation (DT-008) |
 | v1.6.1 | Mobile map view fixes — bottom pill overlap, Safari popup block, zoom control collision, consistent pill spacing, CDN deploy pipeline |
+| v1.7.0 | POI Management Phase 1 (DT-018) — Firestore-backed POIs, 8 categories, Nominatim geocoding, management panel, map markers on all views, voice announcements with entry-detection |
 
 ---
 
@@ -28,7 +29,6 @@ Update this file when a feature moves from one stage to the next.
 
 | ID | Feature | Notes |
 |---|---|---|
-| DT-018 | POI Management | Phase 1: desktop POI management, map markers on all views, voice announcements during recording and replay. Spec: `specs/DT-018-poi-management.md` |
 
 ---
 
@@ -47,7 +47,6 @@ Update this file when a feature moves from one stage to the next.
 | DT-015 | Shared Garage (FuelTracker integration) | Single Firestore-backed vehicle garage at `users/{uid}/vehicles/{id}` shared between DriveTracker and FuelTracker via onSnapshot. Requires vehicle schema alignment and SQLite→Firestore migration for FuelTracker. Medium-High scope. |
 | DT-016 | Cost Per Drive (FuelTracker integration) | Display estimated fuel cost on Drive History cards using FuelTracker's rolling MPG and last fuel price (`distance ÷ MPG × $/gal`). Depends on DT-015. Low-Medium scope. |
 | DT-017 | Drive Share | Generate a shareable link for any drive that opens the full map view and replay for anyone — no login required. Recipient sees the route, Drive DNA scores, and can use all replay controls (play/pause/stop/seek/speed). Link contains or references the drive's coordinate data. Medium scope. |
-| DT-018 | POI Management | Add, edit, and delete named Points of Interest that persist to Firestore and appear as markers on the map. Includes a management UI (list + add/edit form) and custom map markers. Extension: voice announcement via Web Speech API (`speechSynthesis`) when approaching a POI during recording — trigger radius (fixed ~500m or user-configurable per POI), per-POI cooldown to prevent repeated announcements, and audio focus/interruption testing on iOS/Android. Medium scope. |
 
 ---
 

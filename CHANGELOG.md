@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.0] - 2026-06-21
+
+### Added
+
+#### Points of Interest (DT-018 Phase 1)
+
+- **POI management panel** — Hamburger menu → Points of Interest opens a right-side slide-in panel (desktop only; hidden on mobile via CSS media query). Create, edit, and delete POIs with a name, optional friendly name, category, address, and notes.
+- **8 categories** — Fuel Stop, Track / Circuit, Viewpoint / Scenic, Restaurant / Café, Parking, Home / Base, Garage / Storage, Other — each with a distinct icon and color.
+- **Address lookup** — Nominatim (OpenStreetMap) forward geocoding with a results dropdown; also supports map-click-to-place with automatic reverse geocoding.
+- **Map markers** — POI pins appear on all map views: main map, drive detail, and drive replay. Optional radius circle toggle in POI settings.
+- **Voice announcements** — Web Speech API announces "Approaching [name]" on entry into the approach radius (default 300 m) during live recording and drive replay. Uses entry-detection (outside→inside boundary crossing) so announcements fire once per visit rather than on a timer. Prefers Google US English voice when available.
+- **Replay checkbox** — Drive replay includes a 📍 POIs toggle to enable/disable announcements per session.
+- **Configurable radius** — Global approach radius setting (metres) persisted in Firestore alongside a show/hide radius circle toggle.
+- **Cloud storage** — POIs stored in Firestore at `users/{uid}/pois/{id}`; real-time `onSnapshot` listener keeps the in-memory cache current across devices.
+
+---
+
 ## [1.6.1] - 2026-06-21
 
 ### Fixed
