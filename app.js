@@ -1508,8 +1508,18 @@ async function openDriveMap(drive) {
     .hud-label { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; }
     .hud-value { font-size: 15px; font-weight: 700; color: #f1f5f9; font-variant-numeric: tabular-nums; }
 
+    /* Bottom pill stack — controls sit directly above DNA, gap between them */
+    #bottom-pills {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+      z-index: 1000;
+    }
+    /* Override glass-pill's position:fixed for the two bottom children */
+    #replay-controls, #dna { position: relative; left: auto; transform: none; }
+
     /* Replay controls */
-    #replay-controls { bottom: 80px; padding: 8px 12px; display: flex; align-items: center; gap: 6px; }
+    #replay-controls { padding: 8px 12px; display: flex; align-items: center; gap: 6px; }
     .rp-btn {
       display: flex; align-items: center; justify-content: center; gap: 5px;
       min-width: 44px; min-height: 44px; padding: 0 12px;
@@ -1530,7 +1540,7 @@ async function openDriveMap(drive) {
 
     /* DNA pill */
     #dna {
-      bottom: 16px; padding: 10px 16px;
+      padding: 10px 16px;
       display: flex; align-items: center; justify-content: center;
       flex-wrap: wrap; gap: 10px 14px; max-width: calc(100vw - 32px);
     }
@@ -1565,6 +1575,7 @@ async function openDriveMap(drive) {
 
   <div id="map"></div>
 
+  <div id="bottom-pills">
   <div id="replay-controls" class="glass-pill">
     <button class="rp-btn" id="rp-stop" title="Stop">
       <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><rect x="0" y="0" width="13" height="13" rx="2"/></svg>
@@ -1594,6 +1605,7 @@ async function openDriveMap(drive) {
   </div>
 
   <div id="dna" class="glass-pill">${buildDnaHTML(score)}</div>
+  </div><!-- #bottom-pills -->
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
