@@ -17,7 +17,17 @@ gsutil cp sw.js "$BUCKET/sw.js"
 gsutil setmeta -h "Cache-Control:no-cache, no-store, must-revalidate" "$BUCKET/sw.js"
 gsutil setmeta -h "Cache-Control:no-cache, no-store, must-revalidate" "$BUCKET/index.html"
 
-# Invalidate Cloud CDN so changes are visible immediately
-gcloud compute url-maps invalidate-cdn-cache drive-tracker-urlmap --path "/*" --async
+# Short CDN TTL on versioned assets — the CDN strips query strings so the
+# ?v=N cache-busting strategy only works at the browser level. 5-minute
+# max-age ensures CDN nodes serve fresh content within 5 minutes of a deploy
+# without requiring an explicit cache invalidation.
+gsutil setmeta -h "Cache-Control:public, max-age=300" "$BUCKET/app.js"
+gsutil setmeta -h "Cache-Control:public, max-age=300" "$BUCKET/styles.css"
+gsutil setmeta -h "Cache-Control:public, max-age=300" "$BUCKET/ui-theme/theme.css"
+
+# Best-effort CDN invalidation for immediate propagation.
+# Requires compute.urlMaps.invalidateCache permission (see BUG-001).
+# Degrades gracefully to the 5-minute TTL above if this fails.
+gcloud compute url-maps invalidate-cdn-cache drive-tracker-urlmap --path "/*" --async || true
 
 echo "Done. Live at https://drivetracker.soccerwrek.net"
