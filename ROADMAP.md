@@ -14,15 +14,10 @@ Update this file when a feature moves from one stage to the next.
 | v1.2.0 | About modal, Settings → Garage rename, garage icon |
 | v1.2.1 | Long-drive stability — iterative RDP, GPS gap detection, wake lock heartbeat, arrow cap, rolling flush, secret management |
 | v1.3.0 | "Copy for AI" drive export (DT-002), Pause and resume drive recording (DT-013) |
-
----
-
-## 🚀 Next Up — v1.4.0
-
-| ID | Feature |
-|---|---|
-| DT-003 | Drive Score / Road DNA |
-
+| v1.4.0 | Drive Score / Road DNA (DT-003) |
+| v1.5.0 | Drive History panel hardening — XSS fixes, a11y, performance, mobile UX |
+| v1.5.1 | Drive recovery after OS kill |
+| v1.6.0 | Drive Replay / Animation (DT-008) |
 
 ---
 
@@ -34,7 +29,6 @@ Update this file when a feature moves from one stage to the next.
 | DT-005 | Speed-adaptive RDP epsilon | Apply tighter RDP on city sections, looser on highways for optimal point reduction |
 | DT-006 | Drive Comparison | Overlay two drives on the same map and speed graph — "was I faster Tuesday or Sunday?" |
 | DT-007 | Achievement System | Unlockable milestones: First 1,000 miles, Elevation Seeker, Night Owl, etc. |
-| DT-008 | Drive replay / animation | Replay the drive on the map with the car marker moving along the recorded route |
 | DT-010 | OBD-II Bluetooth integration | Pair with ELM327 dongle for real engine telemetry (RPM, boost, coolant temp) |
 | DT-011 | Group Drive / Convoy Mode | Multiple DriveTracker users share a real-time map during a group drive |
 | DT-012 | Drive History pagination & search | History panel currently loads all drives at once — add pagination, virtual scrolling, and date/vehicle filtering to keep the UI performant as the drive count grows into the hundreds |

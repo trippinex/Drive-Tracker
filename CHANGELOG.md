@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.0] - 2026-06-21
+
+### Added
+
+#### Drive Replay / Animation (DT-008)
+
+Tap the 🗺 Map button on any Drive History card to open the full-screen route map. Four glass pills overlay the map:
+
+- **Drive info** (top) — vehicle name, date, distance, and duration; unchanged from before
+- **Replay HUD** (below info) — shows the recorded wall-clock time and GPS speed at the chevron's current position; updates live during playback
+- **Playback controls** (above DNA pill) — Play/Pause toggle, Stop, −10 min, +10 min, and speed selector
+- **Drive DNA** (bottom) — existing Curve / Elevation / Speed / Overall grades; unchanged
+
+**Playback controls:**
+- **Play/Pause** — single button that toggles between ▶ and ⏸; hitting Play zooms the map to a ~5-mile radius around the car's current position
+- **Stop** — resets the marker to the route start and restores the full-route map view
+- **−10 min / +10 min** — seeks 10 minutes of recorded drive time backward or forward; clamps at the ends
+- **Speed** — cycles 1× → 2× → 4× → 8× → 16× → 32× → 1× on each tap; label turns orange above 1×
+
+**Replay marker:**
+- If the active vehicle has a photo, the photo is used as the replay marker (full image, `object-fit: contain`, rounded corners)
+- Falls back to a rotating orange chevron when no photo is on file
+
+**Map behaviour:**
+- On Play: map zooms to a ~5-mile radius around the marker
+- During playback: an invisible 3-mile bounding box around the marker is checked every frame; the map repans to re-center before the marker reaches the viewport edge
+- On Stop: map restores the full-route view
+
+---
+
 ## [1.5.1] - 2026-06-20
 
 ### Fixed
