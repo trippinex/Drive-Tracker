@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.4] - 2026-06-21
+
+### Fixed
+
+- **Voice quality on Safari** — improved voice selection to prefer iOS/macOS "Samantha" (or any downloaded Enhanced voice) over the generic `en-US` fallback. Also fixed a precedence bug in the previous selection logic (`!v.localService === false` was ambiguous). Chrome/Android still prefers `Google US English`; Safari users now get a noticeably more natural voice.
+
+---
+
 ## [1.7.3] - 2026-06-21
 
 ### Fixed

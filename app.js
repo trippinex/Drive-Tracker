@@ -16,7 +16,7 @@
 'use strict';
 
 // Current app version — update this with every release.
-const APP_VERSION = '1.7.3';
+const APP_VERSION = '1.7.4';
 const APP_IS_BETA = false;
 
 // ═══════════════════════════════════════════════════════════════
@@ -2729,7 +2729,8 @@ function _initPreferredVoice() {
   if (!voices.length) return;
   _preferredVoice =
     voices.find(v => v.name === 'Google US English') ||
-    voices.find(v => v.lang === 'en-US' && !v.localService === false) ||
+    voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('enhanced')) ||
+    voices.find(v => v.name === 'Samantha') ||
     voices.find(v => v.lang === 'en-US') ||
     null;
 }
