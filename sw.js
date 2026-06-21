@@ -15,9 +15,9 @@
 // v3: evicts the old shell that still contained app.js with seedDefaultVehicles().
 // Any device running the v2 shell was serving stale app.js which re-seeded
 // the default vehicles on every fresh IndexedDB, regardless of the DB v3 migration.
-const SHELL_CACHE   = 'DriveTracker-shell-v30';
-const CDN_CACHE     = 'DriveTracker-cdn-v30';
-const TILE_CACHE    = 'DriveTracker-tiles-v30';
+const SHELL_CACHE   = 'DriveTracker-shell-v31';
+const CDN_CACHE     = 'DriveTracker-cdn-v31';
+const TILE_CACHE    = 'DriveTracker-tiles-v31';
 const MAX_TILES     = 2000;   // tile entries cap (~50 MB at avg 25 KB/tile)
 const MAX_TILE_AGE  = 7 * 24 * 60 * 60 * 1000;  // 7 days in ms
 
@@ -28,8 +28,8 @@ const MAX_TILE_AGE  = 7 * 24 * 60 * 60 * 1000;  // 7 days in ms
 // cache.addAll() fails the entire SW install if ANY asset returns non-200.
 const SHELL_ASSETS = [
   '/index.html',
-  '/app.js?v=29',
-  '/styles.css?v=29',
+  '/app.js?v=30',
+  '/styles.css?v=30',
   '/manifest.json',
   '/ui-theme/theme.css?v=27',
 ];
