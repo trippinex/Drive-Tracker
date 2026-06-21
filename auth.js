@@ -69,6 +69,7 @@ function initFirebase() {
   // ── Sign out ────────────────────────────────────────────────────────────────
   function signOutUser() {
     window.stopRealtimeSync?.();   // detach Firestore listeners before signing out
+    window.stopPoiListener?.();    // detach POI listener
     auth.signOut().then(() => {
       // Clear user info from the header.
       const avatar = document.getElementById('user-avatar');
