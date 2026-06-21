@@ -1639,7 +1639,11 @@ async function openDriveMap(drive) {
     const SPEEDS       = [1, 2, 4, 8, 16, 32];
 
     // ── Map ──────────────────────────────────────────────────────
-    const map = L.map('map', { zoomControl: true });
+    const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+    const map = L.map('map', { zoomControl: false });
+    if (!isTouchDevice) {
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+    }
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 19
     }).addTo(map);
