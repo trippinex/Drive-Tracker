@@ -27,6 +27,7 @@ Update this file when a feature moves from one stage to the next.
 | v1.7.5 | Safari voice respects iOS system TTS preference — no longer overrides user-selected voice (e.g. Ava Enhanced) |
 | v1.7.6 | Voice picker — hamburger menu item to select and preview announcement voice per device, saved to localStorage |
 | v1.7.7 | Hamburger menu reordered — History, settings cluster (Garage / POI / Voice), Sync, About, Sign Out |
+| v1.7.8 | Hamburger menu grouping — removed dividers within settings cluster so Garage / POI / Voice appear visually grouped |
 
 ---
 

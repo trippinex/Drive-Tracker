@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.8] - 2026-06-21
+
+### Changed
+
+- **Hamburger menu grouping** — removed dividers between Garage, Points of Interest, and Voice so they render as a visually cohesive settings cluster. Dividers remain only between the four top-level groups: History | settings cluster | Sync | About | Sign Out.
+
+---
+
 ## [1.7.7] - 2026-06-21
 
 ### Changed
